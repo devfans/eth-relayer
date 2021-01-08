@@ -51,6 +51,7 @@ const (
 type ServiceConfig struct {
 	PolyConfig      *PolyConfig
 	ETHConfig       *ETHConfig
+	BridgeUrl       []string
 	BoltDbPath      string
 	RoutineNum      int64
 	TargetContracts []map[string]map[string][]uint64
@@ -72,10 +73,6 @@ type ETHConfig struct {
 	KeyStorePwdSet      map[string]string
 	BlockConfig         uint64
 	HeadersPerBatch     int
-}
-
-type ONTConfig struct {
-	RestURL string
 }
 
 func ReadFile(fileName string) ([]byte, error) {

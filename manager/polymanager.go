@@ -49,13 +49,89 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/polynetwork/eth_relayer/tools"
+	"poly-bridge/bridgesdk"
 
 	polytypes "github.com/polynetwork/poly/core/types"
 )
 
 const (
-	ChanLen = 64
+	ChanLen = 1
 )
+
+const (
+	FEE_NOCHECK = iota
+	FEE_HASPAY
+	FEE_NOTPAY
+)
+
+type BridgeTransaction struct {
+	header *polytypes.Header
+	param *common2.ToMerkleValue
+	headerProof string
+	anchorHeader *polytypes.Header
+	polyTxHash string
+	rawAuditPath []byte
+	hasPay uint8
+	fee string
+}
+
+func (this *BridgeTransaction) Serialization(sink *common.ZeroCopySink) {
+	this.header.Serialization(sink)
+	this.param.Serialization(sink)
+	if this.headerProof != "" && this.anchorHeader != nil {
+		sink.WriteUint8(1)
+		sink.WriteString(this.headerProof)
+		this.anchorHeader.Serialization(sink)
+	} else {
+		sink.WriteUint8(0)
+	}
+	sink.WriteString(this.polyTxHash)
+	sink.WriteVarBytes(this.rawAuditPath)
+	sink.WriteUint8(this.hasPay)
+	sink.WriteString(this.fee)
+}
+
+func (this *BridgeTransaction) Deserialization(source *common.ZeroCopySource) error {
+	this.header = new(polytypes.Header)
+	err := this.header.Deserialization(source)
+	if err != nil {
+		return err
+	}
+	this.param = new(common2.ToMerkleValue)
+	err = this.param.Deserialization(source)
+	if err != nil {
+		return err
+	}
+	anchor, eof := source.NextUint8()
+	if eof {
+		return fmt.Errorf("Waiting deserialize anchor error")
+	}
+	if anchor == 1 {
+		this.headerProof, eof = source.NextString()
+		if eof {
+			return fmt.Errorf("Waiting deserialize header proof error")
+		}
+		this.anchorHeader = new(polytypes.Header)
+		this.anchorHeader.Deserialization(source)
+	}
+	this.polyTxHash, eof = source.NextString()
+	if eof {
+		return fmt.Errorf("Waiting deserialize poly tx hash error")
+	}
+	this.rawAuditPath, eof = source.NextVarBytes()
+	if eof {
+		return fmt.Errorf("Waiting deserialize poly tx hash error")
+	}
+	this.hasPay, eof = source.NextUint8()
+	if eof {
+		return fmt.Errorf("Waiting deserialize has pay error")
+	}
+	this.fee, eof = source.NextString()
+	if eof {
+		return fmt.Errorf("Waiting deserialize fee error")
+	}
+	return nil
+}
 
 type PolyManager struct {
 	config        *config.ServiceConfig
@@ -66,6 +142,7 @@ type PolyManager struct {
 	db            *db.BoltDB
 	ethClient     *ethclient.Client
 	senders       []*EthSender
+	bridgeSdk     *bridgesdk.BridgeSdkPro
 }
 
 func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, polySdk *sdk.PolySdk, ethereumsdk *ethclient.Client, boltDB *db.BoltDB) (*PolyManager, error) {
@@ -110,6 +187,7 @@ func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, poly
 
 		senders[i] = v
 	}
+	sdk := bridgesdk.NewBridgeSdkPro(servCfg.BridgeUrl, 5)
 	return &PolyManager{
 		exitChan:      make(chan int),
 		config:        servCfg,
@@ -119,6 +197,7 @@ func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, poly
 		db:            boltDB,
 		ethClient:     ethereumsdk,
 		senders:       senders,
+		bridgeSdk: sdk,
 	}, nil
 }
 
@@ -313,11 +392,20 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 					}
 				}
 				cnt++
-				sender := this.selectSender()
-				log.Infof("sender %s is handling poly tx ( hash: %s, height: %d )",
-					sender.acc.Address.String(), event.TxHash, height)
-				// temporarily ignore the error for tx
-				sender.commitDepositEventsWithHeader(hdr, param, hp, anchor, event.TxHash, auditpath)
+				//
+				bridgeTransaction := &BridgeTransaction{
+					header:       hdr,
+					param:        param,
+					headerProof:  hp,
+					anchorHeader: anchor,
+					polyTxHash:   event.TxHash,
+					rawAuditPath: auditpath,
+					hasPay: FEE_NOCHECK,
+					fee:"",
+				}
+				sink := common.NewZeroCopySink(nil)
+				bridgeTransaction.Serialization(sink)
+				this.db.PutBridgeTransactions(hex.EncodeToString(param.MakeTxParam.TxHash), sink.Bytes())
 				//if !sender.commitDepositEventsWithHeader(hdr, param, hp, anchor, event.TxHash, auditpath) {
 				//	return false
 				//}
@@ -356,10 +444,110 @@ func (this *PolyManager) selectSender() *EthSender {
 	return this.senders[0]
 }
 
+func (this *PolyManager) MonitorDeposit() {
+	monitorTicker := time.NewTicker(config.ETH_MONITOR_INTERVAL)
+	for {
+		select {
+		case <-monitorTicker.C:
+			this.handleLockDepositEvents()
+		case <-this.exitChan:
+			return
+		}
+	}
+}
+
+func (this *PolyManager) handleLockDepositEvents() error {
+	retryList, err := this.db.GetAllBridgeTransactions()
+	if err != nil {
+		return fmt.Errorf("handleLockDepositEvents - this.db.GetAllBridgeTransactions error: %s", err)
+	}
+	if len(retryList) == 0 {
+		return nil
+	}
+	bridgeTransactions := make(map[string]*BridgeTransaction, 0)
+	for k, v := range retryList {
+		bridgeTransaction := new(BridgeTransaction)
+		err := bridgeTransaction.Deserialization(common.NewZeroCopySource(v))
+		if err != nil {
+			log.Errorf("handleLockDepositEvents - retry.Deserialization error: %s", err)
+			continue
+		}
+		bridgeTransactions[k] = bridgeTransaction
+	}
+	noCheckFees := make([]string, 0)
+	for k, v := range bridgeTransactions {
+		if v.hasPay == FEE_NOCHECK {
+			noCheckFees = append(noCheckFees, k)
+		}
+	}
+	if len(noCheckFees) > 0 {
+		checkFees, err := this.checkFee(noCheckFees)
+		if err != nil {
+			log.Errorf("handleLockDepositEvents - checkFee error: %s", err)
+		}
+		if checkFees != nil {
+			for _, checkfee := range checkFees {
+				if checkfee.Error != "" {
+					continue
+				}
+				item, ok := bridgeTransactions[checkfee.Hash]
+				if ok {
+					if checkfee.HasPay == true {
+						item.hasPay = FEE_HASPAY
+						item.fee = checkfee.Amount
+					} else {
+						item.hasPay = FEE_NOTPAY
+					}
+				}
+			}
+		}
+	}
+	for k, v := range bridgeTransactions {
+		if v.hasPay == FEE_NOTPAY {
+			this.db.DeleteBridgeTransactions(k)
+			delete(bridgeTransactions, k)
+		}
+	}
+	var maxFeeOfTransaction *BridgeTransaction = nil
+	maxFee := new(big.Int).SetUint64(0)
+	maxFeeOfTxHash := ""
+	for k, v := range bridgeTransactions {
+		fee, ok := new(big.Int).SetString(v.fee, 10)
+		if ok != true {
+			continue
+		}
+		if v.hasPay == FEE_HASPAY && fee.Cmp(maxFee) > 0 {
+			maxFee = fee
+			maxFeeOfTransaction = v
+			maxFeeOfTxHash = k
+		}
+	}
+	if maxFeeOfTransaction != nil {
+		sender := this.selectSender()
+		log.Infof("sender %s is handling poly tx ( hash: %s)", sender.acc.Address.String(), maxFeeOfTransaction.param.TxHash)
+		res := sender.commitDepositEventsWithHeader(maxFeeOfTransaction.header, maxFeeOfTransaction.param, maxFeeOfTransaction.headerProof,
+			maxFeeOfTransaction.anchorHeader, hex.EncodeToString(maxFeeOfTransaction.param.TxHash), maxFeeOfTransaction.rawAuditPath)
+		if res == true {
+			this.db.DeleteBridgeTransactions(maxFeeOfTxHash)
+			delete(bridgeTransactions, maxFeeOfTxHash)
+		}
+	}
+	for k, v := range bridgeTransactions {
+		sink := common.NewZeroCopySink(nil)
+		v.Serialization(sink)
+		this.db.PutBridgeTransactions(k, sink.Bytes())
+	}
+	return nil
+}
+
 func (this *PolyManager) Stop() {
 	this.exitChan <- 1
 	close(this.exitChan)
 	log.Infof("poly chain manager exit.")
+}
+
+func (this *PolyManager) checkFee(hashs []string) ([]*bridgesdk.CheckFeeRsp, error) {
+	return this.bridgeSdk.CheckFee(hashs)
 }
 
 type EthSender struct {

@@ -33,6 +33,7 @@ var (
 	BKTCheck  = []byte("Check")
 	BKTRetry  = []byte("Retry")
 	BKTHeight = []byte("Height")
+	BKTBridgeTransactions = []byte("Bridge Transactions")
 )
 
 type BoltDB struct {
@@ -235,6 +236,67 @@ func (w *BoltDB) GetPolyHeight() uint32 {
 		return nil
 	})
 	return h
+}
+
+func (w *BoltDB) PutBridgeTransactions(txHash string, v []byte) error {
+	w.rwlock.Lock()
+	defer w.rwlock.Unlock()
+	k, err := hex.DecodeString(txHash)
+	if err != nil {
+		return err
+	}
+	return w.db.Update(func(btx *bolt.Tx) error {
+		bucket := btx.Bucket(BKTBridgeTransactions)
+		err := bucket.Put(k, v)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (w *BoltDB) DeleteBridgeTransactions(txHash string) error {
+	w.rwlock.Lock()
+	defer w.rwlock.Unlock()
+	k, err := hex.DecodeString(txHash)
+	if err != nil {
+		return err
+	}
+	return w.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(BKTBridgeTransactions)
+		err := bucket.Delete(k)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (w *BoltDB) GetAllBridgeTransactions() (map[string][]byte, error) {
+	w.rwlock.Lock()
+	defer w.rwlock.Unlock()
+
+	checkMap := make(map[string][]byte)
+	err := w.db.Update(func(tx *bolt.Tx) error {
+		bw := tx.Bucket(BKTBridgeTransactions)
+		bw.ForEach(func(k, v []byte) error {
+			_k := make([]byte, len(k))
+			_v := make([]byte, len(v))
+			copy(_k, k)
+			copy(_v, v)
+			checkMap[hex.EncodeToString(_k)] = _v
+			if len(checkMap) >= MAX_NUM {
+				return fmt.Errorf("max num")
+			}
+			return nil
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return checkMap, nil
 }
 
 func (w *BoltDB) Close() {
