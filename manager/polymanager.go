@@ -504,6 +504,7 @@ func (this *PolyManager) handleLockDepositEvents() error {
 	}
 	for k, v := range bridgeTransactions {
 		if v.hasPay == FEE_NOTPAY {
+			log.Infof("tx (src %d, %s, poly %s) has not pay proxy fee, ignore it", v.param.FromChainID, v.param.MakeTxParam.TxHash, v.polyTxHash)
 			this.db.DeleteBridgeTransactions(k)
 			delete(bridgeTransactions, k)
 		}
