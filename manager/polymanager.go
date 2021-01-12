@@ -187,7 +187,7 @@ func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, poly
 
 		senders[i] = v
 	}
-	sdk := bridgesdk.NewBridgeSdkPro(servCfg.BridgeUrl, 5)
+	bridgeSdk := bridgesdk.NewBridgeSdkPro(servCfg.BridgeUrl, 5)
 	return &PolyManager{
 		exitChan:      make(chan int),
 		config:        servCfg,
@@ -197,7 +197,7 @@ func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, poly
 		db:            boltDB,
 		ethClient:     ethereumsdk,
 		senders:       senders,
-		bridgeSdk: sdk,
+		bridgeSdk: bridgeSdk,
 	}, nil
 }
 
@@ -504,7 +504,8 @@ func (this *PolyManager) handleLockDepositEvents() error {
 	}
 	for k, v := range bridgeTransactions {
 		if v.hasPay == FEE_NOTPAY {
-			log.Infof("tx (src %d, %s, poly %s) has not pay proxy fee, ignore it", v.param.FromChainID, v.param.MakeTxParam.TxHash, v.polyTxHash)
+			log.Infof("tx (src %d, %s, poly %s) has not pay proxy fee, ignore it, payed: %s",
+				v.param.FromChainID, v.param.MakeTxParam.TxHash, v.polyTxHash, v.fee)
 			this.db.DeleteBridgeTransactions(k)
 			delete(bridgeTransactions, k)
 		}
