@@ -492,10 +492,10 @@ func (this *PolyManager) handleLockDepositEvents() error {
 				}
 				item, ok := bridgeTransactions[checkfee.Hash]
 				if ok {
-					if checkfee.HasPay == true {
+					if checkfee.PayState == bridgesdk.STATE_HASPAY {
 						item.hasPay = FEE_HASPAY
 						item.fee = checkfee.Amount
-					} else {
+					} else if checkfee.PayState == bridgesdk.STATE_NOTPAY {
 						item.hasPay = FEE_NOTPAY
 					}
 				}
