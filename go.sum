@@ -537,6 +537,8 @@ github.com/polynetwork/poly v0.0.0-20210108071928-86193b89e4e0 h1:GBiA/1v3dg1wGk
 github.com/polynetwork/poly v0.0.0-20210108071928-86193b89e4e0/go.mod h1:SrFSYe/3uWkouGvoSGkjDPm5sNT95dSFZkQtXRun148=
 github.com/polynetwork/poly-bridge v0.0.0-20210112082403-a45d71989293 h1:jP8vTQQyoJAyq6+DOkh3lSkYrtjWvOdgK4RJKd9vMfs=
 github.com/polynetwork/poly-bridge v0.0.0-20210112082403-a45d71989293/go.mod h1:jjPHojL1RuaMOEr0CT0Pb26kQ6r2/J/gBzFeH2s2Lac=
+github.com/polynetwork/poly-bridge v0.0.0-20210126073749-84ae68c64fc9/go.mod h1:VM6fkKpObOctO8GlEkKB4SQPhGcwYOuztUMwV73Nut4=
+github.com/polynetwork/poly-bridge v0.0.0-20210126083254-80335b53070a/go.mod h1:VM6fkKpObOctO8GlEkKB4SQPhGcwYOuztUMwV73Nut4=
 github.com/polynetwork/poly-go-sdk v0.0.0-20200722030827-6875b6018b93/go.mod h1:a1wMo/VFoUAKX2yVjipvFug6Yu5BPhf/2tP5xywqfIc=
 github.com/polynetwork/poly-go-sdk v0.0.0-20200730112529-d9c0c7ddf3d8/go.mod h1:a1wMo/VFoUAKX2yVjipvFug6Yu5BPhf/2tP5xywqfIc=
 github.com/polynetwork/poly-go-sdk v0.0.0-20200817120957-365691ad3493 h1:wob4aH5NxiDFIOWlpKbmoIb88QOccDNa1+rl93czjr8=

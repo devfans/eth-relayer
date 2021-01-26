@@ -474,10 +474,13 @@ func (this *PolyManager) handleLockDepositEvents() error {
 		}
 		bridgeTransactions[k] = bridgeTransaction
 	}
-	noCheckFees := make([]string, 0)
+	noCheckFees := make([]*bridgesdk.CheckFeeReq, 0)
 	for k, v := range bridgeTransactions {
 		if v.hasPay == FEE_NOCHECK {
-			noCheckFees = append(noCheckFees, k)
+			noCheckFees = append(noCheckFees, &bridgesdk.CheckFeeReq {
+				ChainId: v.param.FromChainID,
+				Hash: k,
+			})
 		}
 	}
 	if len(noCheckFees) > 0 {
@@ -505,7 +508,7 @@ func (this *PolyManager) handleLockDepositEvents() error {
 	for k, v := range bridgeTransactions {
 		if v.hasPay == FEE_NOTPAY {
 			log.Infof("tx (src %d, %s, poly %s) has not pay proxy fee, ignore it, payed: %s",
-				v.param.FromChainID, v.param.MakeTxParam.TxHash, v.polyTxHash, v.fee)
+				v.param.FromChainID, hex.EncodeToString(v.param.MakeTxParam.TxHash), v.polyTxHash, v.fee)
 			this.db.DeleteBridgeTransactions(k)
 			delete(bridgeTransactions, k)
 		}
@@ -548,8 +551,8 @@ func (this *PolyManager) Stop() {
 	log.Infof("poly chain manager exit.")
 }
 
-func (this *PolyManager) checkFee(hashs []string) ([]*bridgesdk.CheckFeeRsp, error) {
-	return this.bridgeSdk.CheckFee(hashs)
+func (this *PolyManager) checkFee(checks []*bridgesdk.CheckFeeReq) ([]*bridgesdk.CheckFeeRsp, error) {
+	return this.bridgeSdk.CheckFee(checks)
 }
 
 type EthSender struct {
