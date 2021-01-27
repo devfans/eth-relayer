@@ -514,11 +514,12 @@ func (this *PolyManager) handleLockDepositEvents() error {
 		}
 	}
 	var maxFeeOfTransaction *BridgeTransaction = nil
-	maxFee := new(big.Int).SetUint64(0)
+	maxFee := new(big.Float).SetUint64(0)
 	maxFeeOfTxHash := ""
 	for k, v := range bridgeTransactions {
-		fee, ok := new(big.Int).SetString(v.fee, 10)
-		if ok != true {
+		fee, result := new(big.Float).SetString(v.fee)
+		if result == false {
+			log.Errorf("fee is invalid")
 			continue
 		}
 		if v.hasPay == FEE_HASPAY && fee.Cmp(maxFee) > 0 {
