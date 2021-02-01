@@ -459,10 +459,14 @@ func (this *PolyManager) selectSender() *EthSender {
 		if err != nil {
 			continue
 		}
-		if bal.Cmp(new(big.Int).SetUint64(100000000000000)) == -1 {
+		if bal.Cmp(new(big.Int).SetUint64(1000000000000000)) == -1 {
+			log.Errorf("account %s balance is not enough......", v.acc.Address.String())
 			continue
 		}
-		if !v.locked {
+		if v.locked {
+			log.Errorf("account %s has locked......", v.acc.Address.String())
+			continue
+		} else {
 			return v
 		}
 	}
@@ -601,9 +605,6 @@ type EthSender struct {
 
 func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	nonce := this.nonceManager.GetAddressNonce(this.acc.Address)
-	if this.id == 0 {
-		info.gasPrice = new(big.Int).Div(info.gasPrice, new(big.Int).SetInt64(3))
-	}
 	tx := types.NewTransaction(nonce, info.contractAddr, big.NewInt(0), info.gasLimit, info.gasPrice, info.txData)
 	signedtx, err := this.keyStore.SignTransaction(tx, this.acc)
 	if err != nil {
