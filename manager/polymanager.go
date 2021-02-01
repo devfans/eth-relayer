@@ -186,6 +186,7 @@ func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, poly
 		v.cmap = make(map[string]chan *EthTxInfo)
 		v.result = make(chan bool)
 		v.locked = false
+		v.id = i
 
 		senders[i] = v
 	}
@@ -590,6 +591,7 @@ type EthSender struct {
 	cmap         map[string]chan *EthTxInfo
 	result       chan bool
 	locked       bool
+	id           int
 	nonceManager *tools.NonceManager
 	ethClient    *ethclient.Client
 	polySdk      *sdk.PolySdk
@@ -599,6 +601,9 @@ type EthSender struct {
 
 func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	nonce := this.nonceManager.GetAddressNonce(this.acc.Address)
+	if this.id == 0 {
+		info.gasPrice = new(big.Int).Div(info.gasPrice, new(big.Int).SetInt64(3))
+	}
 	tx := types.NewTransaction(nonce, info.contractAddr, big.NewInt(0), info.gasLimit, info.gasPrice, info.txData)
 	signedtx, err := this.keyStore.SignTransaction(tx, this.acc)
 	if err != nil {
