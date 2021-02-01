@@ -55,7 +55,7 @@ import (
 )
 
 const (
-	ChanLen = 1
+	ChanLen = 0
 )
 
 const (
@@ -184,6 +184,8 @@ func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, poly
 		v.contractAbi = &contractabi
 		v.nonceManager = tools.NewNonceManager(ethereumsdk)
 		v.cmap = make(map[string]chan *EthTxInfo)
+		v.result = make(chan bool)
+		v.locked = false
 
 		senders[i] = v
 	}
@@ -414,17 +416,23 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 	}
 	if cnt == 0 && isEpoch && isCurr {
 		sender := this.selectSender()
+		if sender == nil {
+			log.Info("There is not sender......")
+			return false
+		}
 		return sender.commitHeader(hdr, pubkList)
 	}
 
 	return true
 }
 
-func (this *PolyManager) selectSender() *EthSender {
+func (this *PolyManager) selectSender1() *EthSender {
 	sum := big.NewInt(0)
 	balArr := make([]*big.Int, len(this.senders))
+	locked := make([]bool, len(this.senders))
 	for i, v := range this.senders {
 	RETRY:
+		locked[i] = v.locked
 		bal, err := v.Balance()
 		if err != nil {
 			log.Errorf("failed to get balance for %s: %v", v.acc.Address.String(), err)
@@ -437,11 +445,27 @@ func (this *PolyManager) selectSender() *EthSender {
 	sum.Rand(rand.New(rand.NewSource(time.Now().Unix())), sum)
 	for i, v := range balArr {
 		res := v.Cmp(sum)
-		if res == 1 || res == 0 {
+		if res >= 0 && !locked[i] {
 			return this.senders[i]
 		}
 	}
 	return this.senders[0]
+}
+
+func (this *PolyManager) selectSender() *EthSender {
+	for _, v := range this.senders {
+		bal, err := v.Balance()
+		if err != nil {
+			continue
+		}
+		if bal.Cmp(new(big.Int).SetUint64(100000000000000)) == -1 {
+			continue
+		}
+		if !v.locked {
+			return v
+		}
+	}
+	return nil
 }
 
 func (this *PolyManager) MonitorDeposit() {
@@ -530,7 +554,11 @@ func (this *PolyManager) handleLockDepositEvents() error {
 	}
 	if maxFeeOfTransaction != nil {
 		sender := this.selectSender()
-		log.Infof("sender %s is handling poly tx ( hash: %s)", sender.acc.Address.String(), maxFeeOfTransaction.param.TxHash)
+		if sender == nil {
+			log.Infof("There is no sender.......")
+			return nil
+		}
+		log.Infof("sender %s is handling poly tx ( hash: %s)", sender.acc.Address.String(), hex.EncodeToString(maxFeeOfTransaction.param.TxHash))
 		res := sender.commitDepositEventsWithHeader(maxFeeOfTransaction.header, maxFeeOfTransaction.param, maxFeeOfTransaction.headerProof,
 			maxFeeOfTransaction.anchorHeader, hex.EncodeToString(maxFeeOfTransaction.param.TxHash), maxFeeOfTransaction.rawAuditPath)
 		if res == true {
@@ -560,6 +588,8 @@ type EthSender struct {
 	acc          accounts.Account
 	keyStore     *tools.EthKeyStore
 	cmap         map[string]chan *EthTxInfo
+	result       chan bool
+	locked       bool
 	nonceManager *tools.NonceManager
 	ethClient    *ethclient.Client
 	polySdk      *sdk.PolySdk
@@ -589,6 +619,12 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	} else {
 		log.Errorf("failed to relay tx to ethereum: (eth_hash: %s, nonce: %d, poly_hash: %s, eth_explorer: %s)",
 			hash.String(), nonce, info.polyTxHash, tools.GetExplorerUrl(this.keyStore.GetChainId())+hash.String())
+	}
+	if this.locked == false {
+		this.result <- true
+	} else {
+		log.Errorf("account %s has unlocked!", this.acc.Address.String())
+		this.locked = false
 	}
 	return nil
 }
@@ -678,7 +714,14 @@ func (this *EthSender) commitDepositEventsWithHeader(header *polytypes.Header, p
 		gasLimit:     gasLimit,
 		polyTxHash:   polyTxHash,
 	}
-	return true
+	select {
+		case <- this.result:
+			return true
+		case <- time.After(time.Second * 300):
+			log.Errorf("account %s has locked!", this.acc.Address.String())
+			this.locked = true
+			return false
+	}
 }
 
 func (this *EthSender) commitHeader(header *polytypes.Header, pubkList []byte) bool {
