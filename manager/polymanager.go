@@ -404,7 +404,7 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 					polyTxHash:   event.TxHash,
 					rawAuditPath: auditpath,
 					hasPay: FEE_NOCHECK,
-					fee:"",
+					fee:"0",
 				}
 				sink := common.NewZeroCopySink(nil)
 				bridgeTransaction.Serialization(sink)
