@@ -535,10 +535,9 @@ github.com/polynetwork/poly v0.0.0-20200715030435-4f1d1a0adb44 h1:QXznsPhBBa1vY6
 github.com/polynetwork/poly v0.0.0-20200715030435-4f1d1a0adb44/go.mod h1:UzlGEWk0eCGsuMJOZfBoZjRbmu4Yw/SudKAIFe1gPnY=
 github.com/polynetwork/poly v0.0.0-20210108071928-86193b89e4e0 h1:GBiA/1v3dg1wGkiXr8IA6/sGUFuHTPTLyS3GtF4tV7k=
 github.com/polynetwork/poly v0.0.0-20210108071928-86193b89e4e0/go.mod h1:SrFSYe/3uWkouGvoSGkjDPm5sNT95dSFZkQtXRun148=
-github.com/polynetwork/poly-bridge v0.0.0-20210112082403-a45d71989293 h1:jP8vTQQyoJAyq6+DOkh3lSkYrtjWvOdgK4RJKd9vMfs=
-github.com/polynetwork/poly-bridge v0.0.0-20210112082403-a45d71989293/go.mod h1:jjPHojL1RuaMOEr0CT0Pb26kQ6r2/J/gBzFeH2s2Lac=
-github.com/polynetwork/poly-bridge v0.0.0-20210126073749-84ae68c64fc9/go.mod h1:VM6fkKpObOctO8GlEkKB4SQPhGcwYOuztUMwV73Nut4=
-github.com/polynetwork/poly-bridge v0.0.0-20210126083254-80335b53070a/go.mod h1:VM6fkKpObOctO8GlEkKB4SQPhGcwYOuztUMwV73Nut4=
+github.com/polynetwork/poly-bridge v0.0.0-20210204030715-2efa2bc007af h1:dE+nWxBI52PkKorgkQ76otdGUaTAK47zqv0n6GHwOF4=
+github.com/polynetwork/poly-bridge v0.0.0-20210204030715-2efa2bc007af/go.mod h1:o+zIMIuFU1vh2eHqJ6exRzOGT3R+ClA8ElBYibL/smM=
+github.com/polynetwork/poly-bridge v0.0.0-20210205080948-5a45ee387277/go.mod h1:o+zIMIuFU1vh2eHqJ6exRzOGT3R+ClA8ElBYibL/smM=
 github.com/polynetwork/poly-go-sdk v0.0.0-20200722030827-6875b6018b93/go.mod h1:a1wMo/VFoUAKX2yVjipvFug6Yu5BPhf/2tP5xywqfIc=
 github.com/polynetwork/poly-go-sdk v0.0.0-20200730112529-d9c0c7ddf3d8/go.mod h1:a1wMo/VFoUAKX2yVjipvFug6Yu5BPhf/2tP5xywqfIc=
 github.com/polynetwork/poly-go-sdk v0.0.0-20200817120957-365691ad3493 h1:wob4aH5NxiDFIOWlpKbmoIb88QOccDNa1+rl93czjr8=
@@ -602,6 +601,7 @@ github.com/shiena/ansicolor v0.0.0-20200904210342-c7312218db18 h1:DAYUYH5869yV94
 github.com/shiena/ansicolor v0.0.0-20200904210342-c7312218db18/go.mod h1:nkxAfR/5quYxwPZhyDxgasBMnRtBZd0FCEpawpjMUFg=
 github.com/shirou/gopsutil v2.20.5-0.20200531151128-663af789c085+incompatible h1:+gAR1bMhuoQnZMTWFIvp7ukynULPsteLzG+siZKLtD8=
 github.com/shirou/gopsutil v2.20.5-0.20200531151128-663af789c085+incompatible/go.mod h1:5b4v6he4MtMOwMlS0TUMTu2PcXUg8+E1lC7eC3UO/RA=
+github.com/shopspring/decimal v1.2.0/go.mod h1:DKyhrW/HYNuLGql+MJL6WCR6knT2jwCFRcu2hWCYk4o=
 github.com/shurcooL/sanitized_anchor_name v1.0.0 h1:PdmoCO6wvbs+7yrJyMORt4/BmY5IYyJwS/kOiWx8mHo=
 github.com/shurcooL/sanitized_anchor_name v1.0.0/go.mod h1:1NzhyTcUVG4SuEtjjoZeVRXNmyL/1OwPU0+IJeTBvfc=
 github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726/go.mod h1:3yhqj7WBBfRhbBlzyOC3gUxftwsU0u8gqevxwIHQpMw=
@@ -609,7 +609,6 @@ github.com/siddontang/ledisdb v0.0.0-20181029004158-becf5f38d373/go.mod h1:mF1Dp
 github.com/siddontang/rdb v0.0.0-20150307021120-fc89ed2e418d/go.mod h1:AMEsy7v5z92TR1JKMkLLoaOQk++LVnOKL3ScbJ8GNGA=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=
-github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d h1:zE9ykElWQ6/NYmHa3jpm/yHnI4xSofP+UP6SpjHcSeM=
 github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d/go.mod h1:OnSkiWE9lh6wB0YB77sQom3nweQdgAjqCqsofrRNTgc=
 github.com/smartystreets/goconvey v1.6.4 h1:fv0U8FUIMPNf1L9lnHLvLhgicrIVChEkdzIKYqbNC9s=
@@ -812,7 +811,6 @@ golang.org/x/sys v0.0.0-20190726091711-fc99dfbffb4e/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20190922100055-0a153f010e69/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191008105621-543471e840be/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
-golang.org/x/sys v0.0.0-20191026070338-33540a1f6037/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20191220142924-d4481acd189f/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200116001909-b77594299b42/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200122134326-e047566fdf82/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=

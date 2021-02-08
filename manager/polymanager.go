@@ -143,10 +143,16 @@ type PolyManager struct {
 	ethClient     *ethclient.Client
 	senders       []*EthSender
 	bridgeSdk     *bridgesdk.BridgeSdkPro
+	eccdInstance      *eccd_abi.EthCrossChainData
 }
 
 func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, polySdk *sdk.PolySdk, ethereumsdk *ethclient.Client, boltDB *db.BoltDB) (*PolyManager, error) {
 	contractabi, err := abi.JSON(strings.NewReader(eccm_abi.EthCrossChainManagerABI))
+	if err != nil {
+		return nil, err
+	}
+	address := ethcommon.HexToAddress(servCfg.ETHConfig.ECCDContractAddress)
+	instance, err := eccd_abi.NewEthCrossChainData(address, ethereumsdk)
 	if err != nil {
 		return nil, err
 	}
@@ -187,6 +193,7 @@ func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, poly
 		v.result = make(chan bool)
 		v.locked = false
 		v.id = i
+		v.eccdInstance = instance
 
 		senders[i] = v
 	}
@@ -201,17 +208,12 @@ func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, poly
 		ethClient:     ethereumsdk,
 		senders:       senders,
 		bridgeSdk: bridgeSdk,
+		eccdInstance: instance,
 	}, nil
 }
 
 func (this *PolyManager) findLatestHeight() uint32 {
-	address := ethcommon.HexToAddress(this.config.ETHConfig.ECCDContractAddress)
-	instance, err := eccd_abi.NewEthCrossChainData(address, this.ethClient)
-	if err != nil {
-		log.Errorf("findLatestHeight - new eth cross chain failed: %s", err.Error())
-		return 0
-	}
-	height, err := instance.GetCurEpochStartHeight(nil)
+	height, err := this.eccdInstance.GetCurEpochStartHeight(nil)
 	if err != nil {
 		log.Errorf("findLatestHeight - GetLatestHeight failed: %s", err.Error())
 		return 0
@@ -281,13 +283,7 @@ func (this *PolyManager) IsEpoch(hdr *polytypes.Header) (bool, []byte, error) {
 	if hdr.NextBookkeeper == common.ADDRESS_EMPTY || blkInfo.NewChainConfig == nil {
 		return false, nil, nil
 	}
-
-	eccdAddr := ethcommon.HexToAddress(this.config.ETHConfig.ECCDContractAddress)
-	eccd, err := eccd_abi.NewEthCrossChainData(eccdAddr, this.ethClient)
-	if err != nil {
-		return false, nil, fmt.Errorf("failed to new eccm: %v", err)
-	}
-	rawKeepers, err := eccd.GetCurEpochConPubKeyBytes(nil)
+	rawKeepers, err := this.eccdInstance.GetCurEpochConPubKeyBytes(nil)
 	if err != nil {
 		return false, nil, fmt.Errorf("failed to get current epoch keepers: %v", err)
 	}
@@ -494,21 +490,21 @@ func (this *PolyManager) handleLockDepositEvents() error {
 		return nil
 	}
 	bridgeTransactions := make(map[string]*BridgeTransaction, 0)
-	for k, v := range retryList {
+	for _, v := range retryList {
 		bridgeTransaction := new(BridgeTransaction)
 		err := bridgeTransaction.Deserialization(common.NewZeroCopySource(v))
 		if err != nil {
 			log.Errorf("handleLockDepositEvents - retry.Deserialization error: %s", err)
 			continue
 		}
-		bridgeTransactions[k] = bridgeTransaction
+		bridgeTransactions[fmt.Sprintf("%d%s", bridgeTransaction.param.FromChainID, hex.EncodeToString(bridgeTransaction.param.MakeTxParam.TxHash))] = bridgeTransaction
 	}
 	noCheckFees := make([]*bridgesdk.CheckFeeReq, 0)
-	for k, v := range bridgeTransactions {
+	for _, v := range bridgeTransactions {
 		if v.hasPay == FEE_NOCHECK {
 			noCheckFees = append(noCheckFees, &bridgesdk.CheckFeeReq {
 				ChainId: v.param.FromChainID,
-				Hash: k,
+				Hash: hex.EncodeToString(v.param.MakeTxParam.TxHash),
 			})
 		}
 	}
@@ -518,17 +514,22 @@ func (this *PolyManager) handleLockDepositEvents() error {
 			log.Errorf("handleLockDepositEvents - checkFee error: %s", err)
 		}
 		if checkFees != nil {
-			for _, checkfee := range checkFees {
-				if checkfee.Error != "" {
+			for _, checkFee := range checkFees {
+				if checkFee.Error != "" {
+					log.Errorf("check fee err: %s", checkFee.Error)
 					continue
 				}
-				item, ok := bridgeTransactions[checkfee.Hash]
+				item, ok := bridgeTransactions[fmt.Sprintf("%d%s", checkFee.ChainId, checkFee.Hash)]
 				if ok {
-					if checkfee.PayState == bridgesdk.STATE_HASPAY {
+					if checkFee.PayState == bridgesdk.STATE_HASPAY {
+						log.Infof("tx(%d,%s) has payed fee", checkFee.ChainId, checkFee.Hash)
 						item.hasPay = FEE_HASPAY
-						item.fee = checkfee.Amount
-					} else if checkfee.PayState == bridgesdk.STATE_NOTPAY {
+						item.fee = checkFee.Amount
+					} else if checkFee.PayState == bridgesdk.STATE_NOTPAY {
+						log.Infof("tx(%d,%s) has not payed fee", checkFee.ChainId, checkFee.Hash)
 						item.hasPay = FEE_NOTPAY
+					} else {
+						log.Errorf("check fee of tx(%d,%s) failed", checkFee.ChainId, checkFee.Hash)
 					}
 				}
 			}
@@ -563,7 +564,7 @@ func (this *PolyManager) handleLockDepositEvents() error {
 			log.Infof("There is no sender.......")
 			return nil
 		}
-		log.Infof("sender %s is handling poly tx ( hash: %s)", sender.acc.Address.String(), hex.EncodeToString(maxFeeOfTransaction.param.TxHash))
+		log.Infof("sender %s is handling poly tx (hash: %s)", sender.acc.Address.String(), hex.EncodeToString(maxFeeOfTransaction.param.TxHash))
 		res := sender.commitDepositEventsWithHeader(maxFeeOfTransaction.header, maxFeeOfTransaction.param, maxFeeOfTransaction.headerProof,
 			maxFeeOfTransaction.anchorHeader, hex.EncodeToString(maxFeeOfTransaction.param.TxHash), maxFeeOfTransaction.rawAuditPath)
 		if res == true {
@@ -601,6 +602,7 @@ type EthSender struct {
 	polySdk      *sdk.PolySdk
 	config       *config.ServiceConfig
 	contractAbi  *abi.ABI
+	eccdInstance *eccd_abi.EthCrossChainData
 }
 
 func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
@@ -655,15 +657,9 @@ func (this *EthSender) commitDepositEventsWithHeader(header *polytypes.Header, p
 			sigs = append(sigs, newsig...)
 		}
 	}
-
-	eccdAddr := ethcommon.HexToAddress(this.config.ETHConfig.ECCDContractAddress)
-	eccd, err := eccd_abi.NewEthCrossChainData(eccdAddr, this.ethClient)
-	if err != nil {
-		panic(fmt.Errorf("failed to new eccm: %v", err))
-	}
 	fromTx := [32]byte{}
 	copy(fromTx[:], param.TxHash[:32])
-	res, _ := eccd.CheckIfFromChainTxExist(nil, param.FromChainID, fromTx)
+	res, _ := this.eccdInstance.CheckIfFromChainTxExist(nil, param.FromChainID, fromTx)
 	if res {
 		log.Debugf("already relayed to eth: ( from_chain_id: %d, from_txhash: %x,  param.Txhash: %x)",
 			param.FromChainID, param.TxHash, param.MakeTxParam.TxHash)
