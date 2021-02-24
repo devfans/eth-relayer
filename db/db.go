@@ -252,10 +252,7 @@ func (w *BoltDB) GetPolyHeight() uint32 {
 func (w *BoltDB) PutBridgeTransactions(txHash string, v []byte) error {
 	w.rwlock.Lock()
 	defer w.rwlock.Unlock()
-	k, err := hex.DecodeString(txHash)
-	if err != nil {
-		return err
-	}
+	k := []byte(txHash)
 	return w.db.Update(func(btx *bolt.Tx) error {
 		bucket := btx.Bucket(BKTBridgeTransactions)
 		err := bucket.Put(k, v)
@@ -270,10 +267,7 @@ func (w *BoltDB) PutBridgeTransactions(txHash string, v []byte) error {
 func (w *BoltDB) DeleteBridgeTransactions(txHash string) error {
 	w.rwlock.Lock()
 	defer w.rwlock.Unlock()
-	k, err := hex.DecodeString(txHash)
-	if err != nil {
-		return err
-	}
+	k := []byte(txHash)
 	return w.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(BKTBridgeTransactions)
 		err := bucket.Delete(k)
@@ -296,7 +290,7 @@ func (w *BoltDB) GetAllBridgeTransactions() (map[string][]byte, error) {
 			_v := make([]byte, len(v))
 			copy(_k, k)
 			copy(_v, v)
-			checkMap[hex.EncodeToString(_k)] = _v
+			checkMap[string(_k)] = _v
 			if len(checkMap) >= MAX_NUM {
 				return fmt.Errorf("max num")
 			}

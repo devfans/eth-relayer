@@ -404,7 +404,7 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 				}
 				sink := common.NewZeroCopySink(nil)
 				bridgeTransaction.Serialization(sink)
-				this.db.PutBridgeTransactions(hex.EncodeToString(param.MakeTxParam.TxHash), sink.Bytes())
+				this.db.PutBridgeTransactions(fmt.Sprintf("%d%s", param.FromChainID, hex.EncodeToString(param.MakeTxParam.TxHash)), sink.Bytes())
 				//if !sender.commitDepositEventsWithHeader(hdr, param, hp, anchor, event.TxHash, auditpath) {
 				//	return false
 				//}
