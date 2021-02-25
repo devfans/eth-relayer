@@ -405,6 +405,8 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 				sink := common.NewZeroCopySink(nil)
 				bridgeTransaction.Serialization(sink)
 				this.db.PutBridgeTransactions(fmt.Sprintf("%d%s", param.FromChainID, hex.EncodeToString(param.MakeTxParam.TxHash)), sink.Bytes())
+				log.Infof("cross chain transactions, from chain id: %d, poly tx: %s, src tx: %s",
+					param.FromChainID, hex.EncodeToString(param.TxHash), hex.EncodeToString(param.MakeTxParam.TxHash))
 				//if !sender.commitDepositEventsWithHeader(hdr, param, hp, anchor, event.TxHash, auditpath) {
 				//	return false
 				//}
@@ -661,8 +663,8 @@ func (this *EthSender) commitDepositEventsWithHeader(header *polytypes.Header, p
 	copy(fromTx[:], param.TxHash[:32])
 	res, _ := this.eccdInstance.CheckIfFromChainTxExist(nil, param.FromChainID, fromTx)
 	if res {
-		log.Debugf("already relayed to eth: ( from_chain_id: %d, from_txhash: %x,  param.Txhash: %x)",
-			param.FromChainID, param.TxHash, param.MakeTxParam.TxHash)
+		log.Infof("already relayed to eth: ( from chain id: %d, poly txhash: %s,  from txhash: %s)",
+			param.FromChainID, hex.EncodeToString(param.TxHash), hex.EncodeToString(param.MakeTxParam.TxHash))
 		return true
 	}
 	//log.Infof("poly proof with header, height: %d, key: %s, proof: %s", header.Height-1, string(key), proof.AuditPath)
