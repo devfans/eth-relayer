@@ -457,7 +457,7 @@ func (this *PolyManager) selectSender() *EthSender {
 		if err != nil {
 			continue
 		}
-		if bal.Cmp(new(big.Int).SetUint64(1000000000000000)) == -1 {
+		if bal.Cmp(new(big.Int).SetUint64(20000000000000000)) == -1 {
 			log.Errorf("account %s balance is not enough......", v.acc.Address.String())
 			continue
 		}
