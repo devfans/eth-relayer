@@ -706,6 +706,7 @@ func (this *EthSender) commitDepositEventsWithHeader(header *polytypes.Header, p
 			for v := range c {
 				if err = this.sendTxToEth(v); err != nil {
 					log.Errorf("failed to send tx to ethereum: error: %v, txData: %s", err, hex.EncodeToString(v.txData))
+					this.result <- true
 				}
 			}
 		}()
