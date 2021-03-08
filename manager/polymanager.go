@@ -461,6 +461,9 @@ func (this *PolyManager) selectSender() *EthSender {
 			log.Errorf("account %s balance is not enough......", v.acc.Address.String())
 			continue
 		}
+		if bal.Cmp(new(big.Int).SetUint64(200000000000000000)) == -1 {
+			log.Errorf("account %s balance is not enough......", v.acc.Address.String())
+		}
 		if v.locked {
 			log.Errorf("account %s has locked......", v.acc.Address.String())
 			continue
