@@ -632,6 +632,7 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	} else {
 		log.Errorf("failed to relay tx to ethereum: (eth_hash: %s, nonce: %d, poly_hash: %s, eth_explorer: %s)",
 			hash.String(), nonce, info.polyTxHash, tools.GetExplorerUrl(this.keyStore.GetChainId())+hash.String())
+		this.nonceManager.ReturnNonce(this.acc.Address, nonce)
 	}
 	if this.locked == false {
 		this.result <- true
