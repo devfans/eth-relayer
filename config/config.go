@@ -51,7 +51,7 @@ const (
 type ServiceConfig struct {
 	PolyConfig      *PolyConfig
 	ETHConfig       *ETHConfig
-	BridgeUrl       []string
+	BridgeUrl       [][]string
 	BoltDbPath      string
 	RoutineNum      int64
 	TargetContracts []map[string]map[string][]uint64

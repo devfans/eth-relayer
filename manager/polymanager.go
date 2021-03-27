@@ -49,7 +49,7 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/polynetwork/eth_relayer/tools"
-	"poly-bridge/bridgesdk"
+	"poly_bridge_sdk"
 
 	polytypes "github.com/polynetwork/poly/core/types"
 )
@@ -142,7 +142,7 @@ type PolyManager struct {
 	db            *db.BoltDB
 	ethClient     *ethclient.Client
 	senders       []*EthSender
-	bridgeSdk     *bridgesdk.BridgeSdkPro
+	bridgeSdk     *poly_bridge_sdk.BridgeFeeCheck
 	eccdInstance      *eccd_abi.EthCrossChainData
 }
 
@@ -197,7 +197,7 @@ func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, poly
 
 		senders[i] = v
 	}
-	bridgeSdk := bridgesdk.NewBridgeSdkPro(servCfg.BridgeUrl, 5)
+	bridgeSdk := poly_bridge_sdk.NewBridgeFeeCheck(servCfg.BridgeUrl, 5)
 	return &PolyManager{
 		exitChan:      make(chan int),
 		config:        servCfg,
@@ -504,10 +504,10 @@ func (this *PolyManager) handleLockDepositEvents() error {
 		}
 		bridgeTransactions[fmt.Sprintf("%d%s", bridgeTransaction.param.FromChainID, hex.EncodeToString(bridgeTransaction.param.MakeTxParam.TxHash))] = bridgeTransaction
 	}
-	noCheckFees := make([]*bridgesdk.CheckFeeReq, 0)
+	noCheckFees := make([]*poly_bridge_sdk.CheckFeeReq, 0)
 	for _, v := range bridgeTransactions {
 		if v.hasPay == FEE_NOCHECK {
-			noCheckFees = append(noCheckFees, &bridgesdk.CheckFeeReq {
+			noCheckFees = append(noCheckFees, &poly_bridge_sdk.CheckFeeReq {
 				ChainId: v.param.FromChainID,
 				Hash: hex.EncodeToString(v.param.MakeTxParam.TxHash),
 			})
@@ -526,11 +526,11 @@ func (this *PolyManager) handleLockDepositEvents() error {
 				}
 				item, ok := bridgeTransactions[fmt.Sprintf("%d%s", checkFee.ChainId, checkFee.Hash)]
 				if ok {
-					if checkFee.PayState == bridgesdk.STATE_HASPAY {
+					if checkFee.PayState == poly_bridge_sdk.STATE_HASPAY {
 						log.Infof("tx(%d,%s) has payed fee", checkFee.ChainId, checkFee.Hash)
 						item.hasPay = FEE_HASPAY
 						item.fee = checkFee.Amount
-					} else if checkFee.PayState == bridgesdk.STATE_NOTPAY {
+					} else if checkFee.PayState == poly_bridge_sdk.STATE_NOTPAY {
 						log.Infof("tx(%d,%s) has not payed fee", checkFee.ChainId, checkFee.Hash)
 						item.hasPay = FEE_NOTPAY
 					} else {
@@ -591,7 +591,7 @@ func (this *PolyManager) Stop() {
 	log.Infof("poly chain manager exit.")
 }
 
-func (this *PolyManager) checkFee(checks []*bridgesdk.CheckFeeReq) ([]*bridgesdk.CheckFeeRsp, error) {
+func (this *PolyManager) checkFee(checks []*poly_bridge_sdk.CheckFeeReq) ([]*poly_bridge_sdk.CheckFeeRsp, error) {
 	return this.bridgeSdk.CheckFee(checks)
 }
 
