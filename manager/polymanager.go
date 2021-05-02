@@ -457,11 +457,11 @@ func (this *PolyManager) selectSender() *EthSender {
 		if err != nil {
 			continue
 		}
-		if bal.Cmp(new(big.Int).SetUint64(20000000000000000)) == -1 {
+		if bal.Cmp(new(big.Int).SetUint64(100000000000000000)) == -1 {
 			log.Errorf("account %s balance is not enough......", v.acc.Address.String())
 			continue
 		}
-		if bal.Cmp(new(big.Int).SetUint64(200000000000000000)) == -1 {
+		if bal.Cmp(new(big.Int).SetUint64(400000000000000000)) == -1 {
 			log.Errorf("account %s balance is not enough......", v.acc.Address.String())
 		}
 		if v.locked {
@@ -548,36 +548,43 @@ func (this *PolyManager) handleLockDepositEvents() error {
 			delete(bridgeTransactions, k)
 		}
 	}
-	var maxFeeOfTransaction *BridgeTransaction = nil
-	maxFee := new(big.Float).SetUint64(0)
-	maxFeeOfTxHash := ""
-	for k, v := range bridgeTransactions {
-		fee, result := new(big.Float).SetString(v.fee)
-		if result == false {
-			log.Errorf("fee is invalid")
-			continue
+	retryBridgeTransactions := make(map[string]*BridgeTransaction, 0)
+	for len(bridgeTransactions) > 0 {
+		var maxFeeOfTransaction *BridgeTransaction = nil
+		maxFee := new(big.Float).SetUint64(0)
+		maxFeeOfTxHash := ""
+		for k, v := range bridgeTransactions {
+			fee, result := new(big.Float).SetString(v.fee)
+			if result == false {
+				log.Errorf("fee is invalid")
+				delete(bridgeTransactions, maxFeeOfTxHash)
+				continue
+			}
+			if v.hasPay == FEE_HASPAY && fee.Cmp(maxFee) > 0 {
+				maxFee = fee
+				maxFeeOfTransaction = v
+				maxFeeOfTxHash = k
+			}
 		}
-		if v.hasPay == FEE_HASPAY && fee.Cmp(maxFee) > 0 {
-			maxFee = fee
-			maxFeeOfTransaction = v
-			maxFeeOfTxHash = k
+		if maxFeeOfTransaction != nil {
+			sender := this.selectSender()
+			if sender == nil {
+				log.Infof("There is no sender.......")
+				return nil
+			}
+			log.Infof("sender %s is handling poly tx (hash: %s)", sender.acc.Address.String(), hex.EncodeToString(maxFeeOfTransaction.param.TxHash))
+			res := sender.commitDepositEventsWithHeader(maxFeeOfTransaction.header, maxFeeOfTransaction.param, maxFeeOfTransaction.headerProof,
+				maxFeeOfTransaction.anchorHeader, hex.EncodeToString(maxFeeOfTransaction.param.TxHash), maxFeeOfTransaction.rawAuditPath)
+			if res == true {
+				this.db.DeleteBridgeTransactions(maxFeeOfTxHash)
+				delete(bridgeTransactions, maxFeeOfTxHash)
+			} else {
+				retryBridgeTransactions[maxFeeOfTxHash] = maxFeeOfTransaction
+				delete(bridgeTransactions, maxFeeOfTxHash)
+			}
 		}
 	}
-	if maxFeeOfTransaction != nil {
-		sender := this.selectSender()
-		if sender == nil {
-			log.Infof("There is no sender.......")
-			return nil
-		}
-		log.Infof("sender %s is handling poly tx (hash: %s)", sender.acc.Address.String(), hex.EncodeToString(maxFeeOfTransaction.param.TxHash))
-		res := sender.commitDepositEventsWithHeader(maxFeeOfTransaction.header, maxFeeOfTransaction.param, maxFeeOfTransaction.headerProof,
-			maxFeeOfTransaction.anchorHeader, hex.EncodeToString(maxFeeOfTransaction.param.TxHash), maxFeeOfTransaction.rawAuditPath)
-		if res == true {
-			this.db.DeleteBridgeTransactions(maxFeeOfTxHash)
-			delete(bridgeTransactions, maxFeeOfTxHash)
-		}
-	}
-	for k, v := range bridgeTransactions {
+	for k, v := range retryBridgeTransactions {
 		sink := common.NewZeroCopySink(nil)
 		v.Serialization(sink)
 		this.db.PutBridgeTransactions(k, sink.Bytes())
