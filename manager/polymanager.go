@@ -583,6 +583,8 @@ func (this *PolyManager) handleLockDepositEvents() error {
 				retryBridgeTransactions[maxFeeOfTxHash] = maxFeeOfTransaction
 				delete(bridgeTransactions, maxFeeOfTxHash)
 			}
+		} else {
+			break
 		}
 	}
 	for k, v := range retryBridgeTransactions {
