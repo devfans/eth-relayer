@@ -553,6 +553,7 @@ func (this *PolyManager) handleLockDepositEvents() error {
 		var maxFeeOfTransaction *BridgeTransaction = nil
 		maxFee := new(big.Float).SetUint64(0)
 		maxFeeOfTxHash := ""
+		log.Infof("select transaction......")
 		for k, v := range bridgeTransactions {
 			fee, result := new(big.Float).SetString(v.fee)
 			if result == false {
