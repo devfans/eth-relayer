@@ -22,6 +22,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"os"
+	"strconv"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -38,19 +43,16 @@ import (
 	sdk "github.com/polynetwork/poly-go-sdk"
 	"github.com/polynetwork/poly/common"
 	"github.com/polynetwork/poly/common/password"
-	"github.com/polynetwork/poly/consensus/vbft/config"
+	vconfig "github.com/polynetwork/poly/consensus/vbft/config"
 	common2 "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
-	"math/rand"
-	"os"
-	"strconv"
-	"strings"
 
 	"math/big"
 	"time"
 
+	"poly_bridge_sdk"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/polynetwork/eth_relayer/tools"
-	"poly_bridge_sdk"
 
 	polytypes "github.com/polynetwork/poly/core/types"
 )
@@ -66,14 +68,14 @@ const (
 )
 
 type BridgeTransaction struct {
-	header *polytypes.Header
-	param *common2.ToMerkleValue
-	headerProof string
+	header       *polytypes.Header
+	param        *common2.ToMerkleValue
+	headerProof  string
 	anchorHeader *polytypes.Header
-	polyTxHash string
+	polyTxHash   string
 	rawAuditPath []byte
-	hasPay uint8
-	fee string
+	hasPay       uint8
+	fee          string
 }
 
 func (this *BridgeTransaction) Serialization(sink *common.ZeroCopySink) {
@@ -144,7 +146,7 @@ type PolyManager struct {
 	ethClient     *ethclient.Client
 	senders       []*EthSender
 	bridgeSdk     *poly_bridge_sdk.BridgeFeeCheck
-	eccdInstance      *eccd_abi.EthCrossChainData
+	eccdInstance  *eccd_abi.EthCrossChainData
 }
 
 func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, polySdk *sdk.PolySdk, ethereumsdk *ethclient.Client, boltDB *db.BoltDB) (*PolyManager, error) {
@@ -208,8 +210,8 @@ func NewPolyManager(servCfg *config.ServiceConfig, startblockHeight uint32, poly
 		db:            boltDB,
 		ethClient:     ethereumsdk,
 		senders:       senders,
-		bridgeSdk: bridgeSdk,
-		eccdInstance: instance,
+		bridgeSdk:     bridgeSdk,
+		eccdInstance:  instance,
 	}, nil
 }
 
@@ -400,8 +402,8 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 					anchorHeader: anchor,
 					polyTxHash:   event.TxHash,
 					rawAuditPath: auditpath,
-					hasPay: FEE_NOCHECK,
-					fee:"0",
+					hasPay:       FEE_NOCHECK,
+					fee:          "0",
 				}
 				sink := common.NewZeroCopySink(nil)
 				bridgeTransaction.Serialization(sink)
@@ -453,6 +455,7 @@ func (this *PolyManager) selectSender1() *EthSender {
 }
 
 func (this *PolyManager) selectSender() *EthSender {
+	return this.senders[int(rand.Uint32())%len(this.senders)]
 	for _, v := range this.senders {
 		bal, err := v.Balance()
 		if err != nil {
@@ -508,9 +511,9 @@ func (this *PolyManager) handleLockDepositEvents() error {
 	noCheckFees := make([]*poly_bridge_sdk.CheckFeeReq, 0)
 	for _, v := range bridgeTransactions {
 		if v.hasPay == FEE_NOCHECK {
-			noCheckFees = append(noCheckFees, &poly_bridge_sdk.CheckFeeReq {
+			noCheckFees = append(noCheckFees, &poly_bridge_sdk.CheckFeeReq{
 				ChainId: v.param.FromChainID,
-				Hash: hex.EncodeToString(v.param.MakeTxParam.TxHash),
+				Hash:    hex.EncodeToString(v.param.MakeTxParam.TxHash),
 			})
 		}
 	}
@@ -632,8 +635,8 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	err = this.ethClient.SendTransaction(context.Background(), signedtx)
 	if err != nil {
 		/*
-		this.nonceManager.ReturnNonce(this.acc.Address, nonce)
-		return fmt.Errorf("commitDepositEventsWithHeader - send transaction error and return nonce %d: %v", nonce, err)
+			this.nonceManager.ReturnNonce(this.acc.Address, nonce)
+			return fmt.Errorf("commitDepositEventsWithHeader - send transaction error and return nonce %d: %v", nonce, err)
 		*/
 		log.Errorf("send transactions err: %v", err)
 		os.Exit(1)
@@ -740,21 +743,21 @@ func (this *EthSender) commitDepositEventsWithHeader(header *polytypes.Header, p
 		polyTxHash:   polyTxHash,
 	}
 	select {
-		case <- this.result:
-			return true
-		case <- time.After(time.Second * 300):
-			log.Errorf("account %s has locked!", this.acc.Address.String())
-			this.locked = true
-			return false
+	case <-this.result:
+		return true
+	case <-time.After(time.Second * 300):
+		log.Errorf("account %s has locked!", this.acc.Address.String())
+		this.locked = true
+		return false
 	}
 }
 
 func (this *EthSender) commitHeader(header *polytypes.Header, pubkList []byte) bool {
 	headerdata := header.GetMessage()
 	var (
-		txData      []byte
-		txErr       error
-		sigs        []byte
+		txData []byte
+		txErr  error
+		sigs   []byte
 	)
 	gasPrice, err := this.ethClient.SuggestGasPrice(context.Background())
 	if err != nil {
