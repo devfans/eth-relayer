@@ -41,6 +41,7 @@ import (
 	"github.com/polynetwork/poly/consensus/vbft/config"
 	common2 "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 
@@ -630,8 +631,13 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	}
 	err = this.ethClient.SendTransaction(context.Background(), signedtx)
 	if err != nil {
+		/*
 		this.nonceManager.ReturnNonce(this.acc.Address, nonce)
 		return fmt.Errorf("commitDepositEventsWithHeader - send transaction error and return nonce %d: %v", nonce, err)
+		*/
+		log.Errorf("send transactions err: %v", err)
+		os.Exit(1)
+		//log.Fatal("send transaction error!")
 	}
 	hash := signedtx.Hash()
 
