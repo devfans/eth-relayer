@@ -842,7 +842,7 @@ func (this *EthSender) Balance() (*big.Int, error) {
 func (this *EthSender) waitTransactionConfirm(polyTxHash string, hash ethcommon.Hash) bool {
 	count := 0
 	for {
-		if count > 600 {
+		if count > 60 {
 			return false
 		}
 		time.Sleep(time.Second * 1)
