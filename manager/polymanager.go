@@ -623,6 +623,9 @@ type EthSender struct {
 
 func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	nonce := this.nonceManager.GetAddressNonce(this.acc.Address)
+	origin := big.NewInt(0).Set(info.gasPrice)
+	maxPrice := big.NewInt(0).Quo(big.NewInt(0).Mul(origin, big.NewInt(15)), big.NewInt(10))
+RETRY:
 	tx := types.NewTransaction(nonce, info.contractAddr, big.NewInt(0), info.gasLimit, info.gasPrice, info.txData)
 	signedtx, err := this.keyStore.SignTransaction(tx, this.acc)
 	if err != nil {
@@ -648,7 +651,16 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	} else {
 		log.Errorf("failed to relay tx to ethereum: (eth_hash: %s, nonce: %d, poly_hash: %s, eth_explorer: %s)",
 			hash.String(), nonce, info.polyTxHash, tools.GetExplorerUrl(this.keyStore.GetChainId())+hash.String())
-		this.nonceManager.ReturnNonce(this.acc.Address, nonce)
+		if info.gasPrice.Cmp(maxPrice) > 0 {
+			log.Errorf("waitTransactionConfirm failed")
+			os.Exit(1)
+		}
+		info.gasPrice = big.NewInt(0).Quo(big.NewInt(0).Mul(info.gasPrice, big.NewInt(11)), big.NewInt(10))
+		if info.gasPrice.Cmp(maxPrice) >= 0 {
+			info.gasPrice.Set(maxPrice)
+		}
+		goto RETRY
+		//this.nonceManager.ReturnNonce(this.acc.Address, nonce)
 	}
 	if this.locked == false {
 		this.result <- true
@@ -825,8 +837,13 @@ func (this *EthSender) Balance() (*big.Int, error) {
 
 // TODO: check the status of tx
 func (this *EthSender) waitTransactionConfirm(polyTxHash string, hash ethcommon.Hash) bool {
+	count := 0
 	for {
+		if count > 600 {
+			return false
+		}
 		time.Sleep(time.Second * 1)
+		count ++
 		_, ispending, err := this.ethClient.TransactionByHash(context.Background(), hash)
 		if err != nil {
 			continue
@@ -835,11 +852,12 @@ func (this *EthSender) waitTransactionConfirm(polyTxHash string, hash ethcommon.
 		if ispending == true {
 			continue
 		} else {
-			receipt, err := this.ethClient.TransactionReceipt(context.Background(), hash)
+			_, err := this.ethClient.TransactionReceipt(context.Background(), hash)
 			if err != nil {
 				continue
 			}
-			return receipt.Status == types.ReceiptStatusSuccessful
+			return true
+			// return receipt.Status == types.ReceiptStatusSuccessful
 		}
 	}
 }
