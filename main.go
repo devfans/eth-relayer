@@ -163,6 +163,7 @@ func initPolyServer(servConfig *config.ServiceConfig, polysdk *sdk.PolySdk, ethe
 		return
 	}
 	go mgr.MonitorChain()
+	go mgr.MonitorDeposit()
 }
 
 func main() {

@@ -51,8 +51,7 @@ Before running, you need feed the configuration file `config.json`.
       "0xabb4...0aba7cf3ee3b953": "pwd2" // password for address "0xabb4...0aba7cf3ee3b953"
     },
     "BlockConfig": 12, // blocks to confirm a ethereum tx
-    "HeadersPerBatch": 500, // number of poly headers commited to ECCM in one transaction at most
-    "MonitorInterval": 3 // seconds of ticker to monitor eth chain
+    "HeadersPerBatch": 500 // number of poly headers commited to ECCM in one transaction at most
   },
   "BoltDbPath": "./db", // DB path
   "RoutineNum": 64,

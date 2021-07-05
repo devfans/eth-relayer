@@ -21,6 +21,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"strings"
+	"time"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -29,11 +33,9 @@ import (
 	"github.com/polynetwork/eth_relayer/config"
 	"github.com/polynetwork/eth_relayer/db"
 	common2 "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
-	"math/big"
-	"strings"
-	"time"
 
 	"context"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/polynetwork/eth_relayer/log"
 	"github.com/polynetwork/eth_relayer/tools"
@@ -156,7 +158,7 @@ func NewEthereumManager(servconfig *config.ServiceConfig, startheight uint64, st
 }
 
 func (this *EthereumManager) MonitorChain() {
-	fetchBlockTicker := time.NewTicker(time.Duration(this.config.ETHConfig.MonitorInterval) * time.Second)
+	fetchBlockTicker := time.NewTicker(config.ETH_MONITOR_INTERVAL)
 	var blockHandleResult bool
 	for {
 		select {
@@ -172,9 +174,6 @@ func (this *EthereumManager) MonitorChain() {
 			log.Infof("MonitorChain - eth height is %d", height)
 			blockHandleResult = true
 			for this.currentHeight < height-config.ETH_USEFUL_BLOCK_NUM {
-				if this.currentHeight%10 == 0 {
-					log.Infof("handle confirmed eth Block height: %d", this.currentHeight)
-				}
 				blockHandleResult = this.handleNewBlock(this.currentHeight + 1)
 				if blockHandleResult == false {
 					break
@@ -243,7 +242,7 @@ func (this *EthereumManager) handleNewBlock(height uint64) bool {
 }
 
 func (this *EthereumManager) handleBlockHeader(height uint64) bool {
-	hdr, err := this.client.HeaderByNumber(context.Background(), big.NewInt(int64(height)))
+	hdr, err := tools.GetNodeHeader(this.config.ETHConfig.RestURL, this.restClient, height)
 	if err != nil {
 		log.Errorf("handleBlockHeader - GetNodeHeader on height :%d failed", height)
 		return false
@@ -388,18 +387,20 @@ func (this *EthereumManager) rollBackToCommAncestor() {
 }
 
 func (this *EthereumManager) MonitorDeposit() {
-	monitorTicker := time.NewTicker(time.Duration(this.config.ETHConfig.MonitorInterval) * time.Second)
+	monitorTicker := time.NewTicker(config.ETH_MONITOR_INTERVAL)
 	for {
 		select {
 		case <-monitorTicker.C:
 			height, err := tools.GetNodeHeight(this.config.ETHConfig.RestURL, this.restClient)
 			if err != nil {
-				log.Infof("MonitorDeposit - cannot get eth node height, err: %s", err)
+				log.Infof("MonitorChain - cannot get node height, err: %s", err)
 				continue
 			}
 			snycheight := this.findLastestHeight()
-			log.Log.Info("MonitorDeposit from eth - snyced eth height", snycheight, "eth height", height, "diff", height-snycheight)
-			this.handleLockDepositEvents(snycheight)
+			if snycheight > height-config.ETH_PROOF_USERFUL_BLOCK {
+				// try to handle deposit event when we are at latest height
+				this.handleLockDepositEvents(snycheight)
+			}
 		case <-this.exitChan:
 			return
 		}
@@ -496,7 +497,7 @@ func (this *EthereumManager) parserValue(value []byte) []byte {
 	return txHash
 }
 func (this *EthereumManager) CheckDeposit() {
-	checkTicker := time.NewTicker(time.Duration(this.config.ETHConfig.MonitorInterval) * time.Second)
+	checkTicker := time.NewTicker(config.ETH_MONITOR_INTERVAL)
 	for {
 		select {
 		case <-checkTicker.C:
