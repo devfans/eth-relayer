@@ -14,6 +14,7 @@ require (
 	github.com/polynetwork/poly-io-test v0.0.0-20200819093740-8cf514b07750 // indirect
 	github.com/stretchr/testify v1.6.1
 	github.com/urfave/cli v1.22.4
+	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
 	poly_bridge_sdk v0.0.0-00010101000000-000000000000
 )
 

@@ -21,6 +21,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"strings"
+	"time"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -29,11 +33,9 @@ import (
 	"github.com/polynetwork/eth_relayer/config"
 	"github.com/polynetwork/eth_relayer/db"
 	common2 "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
-	"math/big"
-	"strings"
-	"time"
 
 	"context"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/polynetwork/eth_relayer/log"
 	"github.com/polynetwork/eth_relayer/tools"
@@ -240,7 +242,7 @@ func (this *EthereumManager) handleNewBlock(height uint64) bool {
 }
 
 func (this *EthereumManager) handleBlockHeader(height uint64) bool {
-	hdr, err := this.client.HeaderByNumber(context.Background(), big.NewInt(int64(height)))
+	hdr, err := tools.GetNodeHeader(this.config.ETHConfig.RestURL, this.restClient, height)
 	if err != nil {
 		log.Errorf("handleBlockHeader - GetNodeHeader on height :%d failed", height)
 		return false
