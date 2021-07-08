@@ -302,7 +302,6 @@ func GetNodeHeader(url string, restClient *RestClient, height uint64) (*Header, 
 	if err != nil {
 		return nil, fmt.Errorf("GetNodeHeight err: %s", err)
 	}
-	fmt.Println("rspdata", string(rspdata))
 	rsp := &blockRsp{}
 	err = json.Unmarshal(rspdata, rsp)
 	if err != nil {
