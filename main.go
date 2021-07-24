@@ -50,6 +50,7 @@ func setupApp() *cli.App {
 		cmd.EthStartFlag,
 		cmd.EthStartForceFlag,
 		cmd.PolyStartFlag,
+		cmd.PolyFetchFlag,
 		cmd.LogDir,
 	}
 	app.Commands = []cli.Command{}
@@ -60,6 +61,16 @@ func setupApp() *cli.App {
 	return app
 }
 
+func handlePolyBlock(height uint32, servConfig *config.ServiceConfig, polysdk *sdk.PolySdk, ethereumsdk *ethclient.Client) {
+	log.Infof("Fetching poly block directly %v", height)
+	mgr, err := manager.NewPolyManager(servConfig, 0, polysdk, ethereumsdk, nil)
+	if err != nil {
+		log.Error("initETHServer - eth service start err: %s", err.Error())
+		return
+	}
+	mgr.HandlePolyBlockDirect(height)
+}
+
 func startServer(ctx *cli.Context) {
 	// get all cmd flag
 	logLevel := ctx.GlobalInt(cmd.GetFlagName(cmd.LogLevelFlag))
@@ -68,21 +79,6 @@ func startServer(ctx *cli.Context) {
 	log.InitLog(logLevel, ld, log.Stdout)
 
 	ConfigPath = ctx.GlobalString(cmd.GetFlagName(cmd.ConfigPathFlag))
-	ethstart := ctx.GlobalUint64(cmd.GetFlagName(cmd.EthStartFlag))
-	if ethstart > 0 {
-		StartHeight = ethstart
-	}
-
-	StartForceHeight = 0
-	ethstartforce := ctx.GlobalUint64(cmd.GetFlagName(cmd.EthStartForceFlag))
-	if ethstartforce > 0 {
-		StartForceHeight = ethstartforce
-	}
-	polyStart := ctx.GlobalUint64(cmd.GetFlagName(cmd.PolyStartFlag))
-	if polyStart > 0 {
-		PolyStartHeight = polyStart
-	}
-
 	// read config
 	servConfig := config.NewServiceConfig(ConfigPath)
 	if servConfig == nil {
@@ -103,6 +99,27 @@ func startServer(ctx *cli.Context) {
 	if err != nil {
 		log.Errorf("startServer - cannot dial sync node, err: %s", err)
 		return
+	}
+
+	polyBlockDirect := ctx.GlobalInt("polyfetch")
+	if polyBlockDirect != 0 {
+		handlePolyBlock(uint32(polyBlockDirect), servConfig, polySdk, ethereumsdk)
+		return
+	}
+
+	ethstart := ctx.GlobalUint64(cmd.GetFlagName(cmd.EthStartFlag))
+	if ethstart > 0 {
+		StartHeight = ethstart
+	}
+
+	StartForceHeight = 0
+	ethstartforce := ctx.GlobalUint64(cmd.GetFlagName(cmd.EthStartForceFlag))
+	if ethstartforce > 0 {
+		StartForceHeight = ethstartforce
+	}
+	polyStart := ctx.GlobalUint64(cmd.GetFlagName(cmd.PolyStartFlag))
+	if polyStart > 0 {
+		PolyStartHeight = polyStart
 	}
 
 	var boltDB *db.BoltDB

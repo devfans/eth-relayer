@@ -174,6 +174,7 @@ func (this *EthereumManager) MonitorChain() {
 			log.Infof("MonitorChain - eth height is %d", height)
 			blockHandleResult = true
 			for this.currentHeight < height-config.ETH_USEFUL_BLOCK_NUM {
+				log.Infof("Handling eth height %v", this.currentHeight + 1)
 				blockHandleResult = this.handleNewBlock(this.currentHeight + 1)
 				if blockHandleResult == false {
 					break
@@ -322,6 +323,7 @@ func (this *EthereumManager) fetchLockDepositEvents(height uint64, client *ethcl
 			value:   []byte(evt.Rawdata),
 			height:  height,
 		}
+		log.Infof("Puting eth src tx %v %s %s", height, crossTx.txIndex, string(crossTx.txId))
 		sink := common.NewZeroCopySink(nil)
 		crossTx.Serialization(sink)
 		err = this.db.PutRetry(sink.Bytes())
@@ -399,7 +401,10 @@ func (this *EthereumManager) MonitorDeposit() {
 			snycheight := this.findLastestHeight()
 			if snycheight > height-config.ETH_PROOF_USERFUL_BLOCK {
 				// try to handle deposit event when we are at latest height
-				this.handleLockDepositEvents(snycheight)
+				err := this.handleLockDepositEvents(snycheight)
+				if err != nil {
+					log.Errorf("Failed to handleLockDepositEvents %v %v", snycheight, err)
+				}
 			}
 		case <-this.exitChan:
 			return
@@ -421,6 +426,7 @@ func (this *EthereumManager) handleLockDepositEvents(refHeight uint64) error {
 		}
 		//1. decode events
 		key := crosstx.txIndex
+		log.Infof("Handling eth src tx %v %s %s", crosstx.height, key, string(crosstx.txId))
 		keyBytes, err := eth.MappingKeyAt(key, "01")
 		if err != nil {
 			log.Errorf("handleLockDepositEvents - MappingKeyAt error:%s\n", err.Error())

@@ -66,6 +66,12 @@ var (
 		Value: uint64(0),
 	}
 
+	PolyFetchFlag = cli.Uint64Flag{
+		Name:  "polyfetch",
+		Usage: "direct poly fetch block height ",
+		Value: uint64(0),
+	}
+
 	PolyStartFlag = cli.Uint64Flag{
 		Name:  "poly",
 		Usage: "poly start block height ",

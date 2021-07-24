@@ -264,9 +264,12 @@ func (this *PolyManager) MonitorChain() {
 			blockHandleResult = true
 			for this.currentHeight <= latestheight-config.ONT_USEFUL_BLOCK_NUM {
 				blockHandleResult = this.handleDepositEvents(this.currentHeight)
+				log.Infof("PolyHeight %v", this.currentHeight)
 				if blockHandleResult == false {
+					log.Errorf("PolyHeight failed %v", this.currentHeight)
 					break
 				}
+				log.Infof("PolyHeight success %v", this.currentHeight)
 				this.currentHeight++
 			}
 			if err = this.db.UpdatePolyHeight(this.currentHeight - 1); err != nil {
@@ -354,6 +357,7 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 					continue
 				}
 				if uint64(states[2].(float64)) != this.config.ETHConfig.SideChainId {
+					log.Errorf("handleDepositEvents invalid side chain id %v", states[2].(float64))
 					continue
 				}
 				proof, err := this.polySdk.GetCrossStatesProof(hdr.Height-1, states[5].(string))
@@ -368,6 +372,11 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 					log.Errorf("handleDepositEvents - failed to deserialize MakeTxParam (value: %x, err: %v)", value, err)
 					continue
 				}
+
+				chainId := param.FromChainID
+				polyTx := hex.EncodeToString(param.TxHash)
+				srcTx := hex.EncodeToString(param.MakeTxParam.TxHash)
+				log.Infof("cross chain transactions, from chain id: %d, height %v poly tx: %s, src tx: %s", chainId, height, polyTx, srcTx)
 				var isTarget bool
 				if len(this.config.TargetContracts) > 0 {
 					toContractStr := ethcommon.BytesToAddress(param.MakeTxParam.ToContractAddress).String()
@@ -390,6 +399,7 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 						}
 					}
 					if !isTarget {
+						log.Warnf(" %s not the target?", polyTx)
 						continue
 					}
 				}
@@ -408,8 +418,6 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 				sink := common.NewZeroCopySink(nil)
 				bridgeTransaction.Serialization(sink)
 				this.db.PutBridgeTransactions(fmt.Sprintf("%d%s", param.FromChainID, hex.EncodeToString(param.MakeTxParam.TxHash)), sink.Bytes())
-				log.Infof("cross chain transactions, from chain id: %d, poly tx: %s, src tx: %s",
-					param.FromChainID, hex.EncodeToString(param.TxHash), hex.EncodeToString(param.MakeTxParam.TxHash))
 				//if !sender.commitDepositEventsWithHeader(hdr, param, hp, anchor, event.TxHash, auditpath) {
 				//	return false
 				//}
@@ -486,6 +494,150 @@ func (this *PolyManager) MonitorDeposit() {
 			this.handleLockDepositEvents()
 		case <-this.exitChan:
 			return
+		}
+	}
+}
+
+func (this *PolyManager) HandlePolyBlockDirect(height uint32) {
+	lastEpoch := this.findLatestHeight()
+	hdr, err := this.polySdk.GetHeaderByHeight(height + 1)
+	if err != nil {
+		log.Errorf("handleDepositEvents - GetNodeHeader on height :%d failed", height)
+		return
+	}
+	isCurr := lastEpoch < height+1
+	isEpoch, _, err := this.IsEpoch(hdr)
+	if err != nil {
+		log.Errorf("falied to check isEpoch: %v", err)
+		return
+	}
+	var (
+		anchor *polytypes.Header
+		hp     string
+	)
+	if !isCurr {
+		anchor, _ = this.polySdk.GetHeaderByHeight(lastEpoch + 1)
+		proof, _ := this.polySdk.GetMerkleProof(height+1, lastEpoch+1)
+		hp = proof.AuditPath
+	} else if isEpoch {
+		anchor, _ = this.polySdk.GetHeaderByHeight(height + 2)
+		proof, _ := this.polySdk.GetMerkleProof(height+1, height+2)
+		hp = proof.AuditPath
+	}
+
+	events, err := this.polySdk.GetSmartContractEventByBlock(height)
+	for err != nil {
+		log.Errorf("handleDepositEvents - get block event at height:%d error: %s", height, err.Error())
+		return
+	}
+	for _, event := range events {
+		for _, notify := range event.Notify {
+			if notify.ContractAddress == this.config.PolyConfig.EntranceContractAddress {
+				states := notify.States.([]interface{})
+				method, _ := states[0].(string)
+				if method != "makeProof" {
+					continue
+				}
+				if uint64(states[2].(float64)) != this.config.ETHConfig.SideChainId {
+					log.Errorf("handleDepositEvents invalid side chain id %v", states[2].(float64))
+					continue
+				}
+				proof, err := this.polySdk.GetCrossStatesProof(hdr.Height-1, states[5].(string))
+				if err != nil {
+					log.Errorf("handleDepositEvents - failed to get proof for key %s: %v", states[5].(string), err)
+					continue
+				}
+				auditpath, _ := hex.DecodeString(proof.AuditPath)
+				value, _, _, _ := tools.ParseAuditpath(auditpath)
+				param := &common2.ToMerkleValue{}
+				if err := param.Deserialization(common.NewZeroCopySource(value)); err != nil {
+					log.Errorf("handleDepositEvents - failed to deserialize MakeTxParam (value: %x, err: %v)", value, err)
+					continue
+				}
+
+				chainId := param.FromChainID
+				polyTx := hex.EncodeToString(param.TxHash)
+				srcTx := hex.EncodeToString(param.MakeTxParam.TxHash)
+				log.Infof("cross chain transactions, from chain id: %d, height %v poly tx: %s, src tx: %s", chainId, height, polyTx, srcTx)
+				var isTarget bool
+				if len(this.config.TargetContracts) > 0 {
+					toContractStr := ethcommon.BytesToAddress(param.MakeTxParam.ToContractAddress).String()
+					for _, v := range this.config.TargetContracts {
+						toChainIdArr, ok := v[toContractStr]
+						if ok {
+							if len(toChainIdArr["inbound"]) == 0 {
+								isTarget = true
+								break
+							}
+							for _, id := range toChainIdArr["inbound"] {
+								if id == param.FromChainID {
+									isTarget = true
+									break
+								}
+							}
+							if isTarget {
+								break
+							}
+						}
+					}
+					if !isTarget {
+						log.Warnf(" %s not the target?", polyTx)
+						continue
+					}
+				}
+				tx := &BridgeTransaction{
+					header:       hdr,
+					param:        param,
+					headerProof:  hp,
+					anchorHeader: anchor,
+					polyTxHash:   event.TxHash,
+					rawAuditPath: auditpath,
+					hasPay:       FEE_NOCHECK,
+					fee:          "0",
+				}
+				noCheckFees := make([]*poly_bridge_sdk.CheckFeeReq, 0)
+				noCheckFees = append(noCheckFees, &poly_bridge_sdk.CheckFeeReq{
+					ChainId: tx.param.FromChainID,
+					Hash:    hex.EncodeToString(tx.param.MakeTxParam.TxHash),
+				})
+
+				checkFees, err := this.checkFee(noCheckFees)
+				if err != nil || len(checkFees) == 0 {
+					log.Errorf("handleLockDepositEvents - checkFee error: %s", err)
+					return
+				}
+				cf := checkFees[0]
+				if cf.Error != "" {
+					log.Errorf("check fee err: %s", cf.Error)
+					continue
+				}
+				if cf.PayState == poly_bridge_sdk.STATE_HASPAY {
+					log.Infof("tx(%d,%s) has payed fee", cf.ChainId, cf.Hash)
+					tx.hasPay = FEE_HASPAY
+					tx.fee = cf.Amount
+				} else if cf.PayState == poly_bridge_sdk.STATE_NOTPAY {
+					log.Infof("tx(%d,%s) has not payed fee", cf.ChainId, cf.Hash)
+					tx.hasPay = FEE_NOTPAY
+					continue
+				} else {
+					log.Errorf("check fee of tx(%d,%s) failed", cf.ChainId, cf.Hash)
+					continue
+				}
+
+				sender := this.selectSender()
+				if sender == nil {
+					log.Infof("There is no sender.......")
+					return
+				}
+				log.Infof("sender %s is handling poly tx (hash: %s)", sender.acc.Address.String(), hex.EncodeToString(tx.param.TxHash))
+				res := sender.commitDepositEventsWithHeader(tx.header, tx.param, tx.headerProof,
+					tx.anchorHeader, hex.EncodeToString(tx.param.TxHash), tx.rawAuditPath)
+				if res == true {
+					log.Errorf("Succeeded to process poly tx")
+				} else {
+					log.Errorf("Failed to process poly tx")
+				}
+			}
 		}
 	}
 }
@@ -846,7 +998,7 @@ func (this *EthSender) waitTransactionConfirm(polyTxHash string, hash ethcommon.
 			return false
 		}
 		time.Sleep(time.Second * 1)
-		count ++
+		count++
 		_, ispending, err := this.ethClient.TransactionByHash(context.Background(), hash)
 		if err != nil {
 			continue
