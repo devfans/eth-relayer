@@ -166,6 +166,7 @@ func initETHServer(servConfig *config.ServiceConfig, polysdk *sdk.PolySdk, ether
 	mgr, err := manager.NewEthereumManager(servConfig, StartHeight, StartForceHeight, polysdk, ethereumsdk, boltDB)
 	if err != nil {
 		log.Error("initETHServer - eth service start err: %s", err.Error())
+		panic(err)
 		return
 	}
 	go mgr.MonitorChain()
@@ -177,6 +178,7 @@ func initPolyServer(servConfig *config.ServiceConfig, polysdk *sdk.PolySdk, ethe
 	mgr, err := manager.NewPolyManager(servConfig, uint32(PolyStartHeight), polysdk, ethereumsdk, boltDB)
 	if err != nil {
 		log.Error("initPolyServer - PolyServer service start failed: %v", err)
+		panic(err)
 		return
 	}
 	go mgr.MonitorChain()
