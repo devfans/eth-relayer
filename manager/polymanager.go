@@ -376,6 +376,10 @@ func (this *PolyManager) handleDepositEvents(height uint32) bool {
 				chainId := param.FromChainID
 				polyTx := hex.EncodeToString(param.TxHash)
 				srcTx := hex.EncodeToString(param.MakeTxParam.TxHash)
+				if param.MakeTxParam.Method != "unlock" {
+					log.Errorf("Invalid target contract method %s", param.MakeTxParam.Method)
+					continue
+				}
 				log.Infof("cross chain transactions, from chain id: %d, height %v poly tx: %s, src tx: %s", chainId, height, polyTx, srcTx)
 				var isTarget bool
 				if len(this.config.TargetContracts) > 0 {
