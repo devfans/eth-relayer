@@ -884,13 +884,13 @@ func (this *EthSender) commitDepositEventsWithHeader(header *polytypes.Header, p
 	headerData = header.GetMessage()
 	txData, err := this.contractAbi.Pack("verifyHeaderAndExecuteTx", rawAuditPath, headerData, rawProof, rawAnchor, sigs)
 	if err != nil {
-		log.Errorf("commitDepositEventsWithHeader - err:" + err.Error())
+		log.Errorf("(poly %s)commitDepositEventsWithHeader - err:%v", polyTxHash, err.Error())
 		return false
 	}
 
 	gasPrice, err := this.ethClient.SuggestGasPrice(context.Background())
 	if err != nil {
-		log.Errorf("commitDepositEventsWithHeader - get suggest sas price failed error: %s", err.Error())
+		log.Errorf("(poly %s)commitDepositEventsWithHeader - get suggest sas price failed error: %s", polyTxHash, err.Error())
 		return false
 	}
 	contractaddr := ethcommon.HexToAddress(this.config.ETHConfig.ECCMContractAddress)
@@ -900,8 +900,8 @@ func (this *EthSender) commitDepositEventsWithHeader(header *polytypes.Header, p
 	}
 	gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)
 	if err != nil {
-		log.Errorf("commitDepositEventsWithHeader - estimate gas limit error: %s", err.Error())
-		return false
+		log.Errorf("(poly %s)commitDepositEventsWithHeader - estimate gas limit error: %s", polyTxHash, err.Error())
+		return true
 	}
 
 	k := this.getRouter()
