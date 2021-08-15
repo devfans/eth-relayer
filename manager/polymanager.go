@@ -78,6 +78,10 @@ type BridgeTransaction struct {
 	fee          string
 }
 
+func (this *BridgeTransaction) PolyHash() string {
+	return this.polyTxHash
+}
+
 func (this *BridgeTransaction) Serialization(sink *common.ZeroCopySink) {
 	this.header.Serialization(sink)
 	this.param.Serialization(sink)
@@ -662,6 +666,7 @@ func (this *PolyManager) handleLockDepositEvents() error {
 			log.Errorf("handleLockDepositEvents - retry.Deserialization error: %s", err)
 			continue
 		}
+		log.Infof("Wait for processing poly tx %s", bridgeTransaction.PolyHash)
 		bridgeTransactions[fmt.Sprintf("%d%s", bridgeTransaction.param.FromChainID, hex.EncodeToString(bridgeTransaction.param.MakeTxParam.TxHash))] = bridgeTransaction
 	}
 	noCheckFees := make([]*poly_bridge_sdk.CheckFeeReq, 0)
@@ -717,7 +722,7 @@ func (this *PolyManager) handleLockDepositEvents() error {
 		for k, v := range bridgeTransactions {
 			fee, result := new(big.Float).SetString(v.fee)
 			if result == false {
-				log.Errorf("fee is invalid")
+				log.Errorf("fee is invalid %s", v.PolyHash())
 				delete(bridgeTransactions, maxFeeOfTxHash)
 				continue
 			}
@@ -730,7 +735,7 @@ func (this *PolyManager) handleLockDepositEvents() error {
 		if maxFeeOfTransaction != nil {
 			sender := this.selectSender()
 			if sender == nil {
-				log.Infof("There is no sender.......")
+				log.Errorf("There is no sender.......")
 				return nil
 			}
 			log.Infof("sender %s is handling poly tx (hash: %s)", sender.acc.Address.String(), hex.EncodeToString(maxFeeOfTransaction.param.TxHash))
@@ -762,7 +767,18 @@ func (this *PolyManager) Stop() {
 }
 
 func (this *PolyManager) checkFee(checks []*poly_bridge_sdk.CheckFeeReq) ([]*poly_bridge_sdk.CheckFeeRsp, error) {
-	return this.bridgeSdk.CheckFee(checks)
+	// return this.bridgeSdk.CheckFee(checks)
+	resp := make([]*poly_bridge_sdk.CheckFeeRsp, len(checks))
+	for i, r := range checks {
+		resp[i] = &poly_bridge_sdk.CheckFeeRsp{
+			ChainId:     r.ChainId,
+			PayState:    poly_bridge_sdk.STATE_HASPAY,
+			Hash:        r.Hash,
+			Amount:      "100",
+			MinProxyFee: "100",
+		}
+	}
+	return resp, nil
 }
 
 type EthSender struct {
