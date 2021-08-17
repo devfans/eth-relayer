@@ -311,8 +311,8 @@ func (this *EthereumManager) fetchLockDepositEvents(height uint64, client *ethcl
 			log.Errorf("param.Deserialization error %v", err)
 			continue
 		}
-		if param.Method != "unlock" {
-			log.Errorf("target contract method invalid %s", param.Method)
+		if !METHODS[param.Method] {
+			log.Errorf("target contract method invalid %s %s", param.Method, evt.Raw.TxHash.String())
 			continue
 		}
 
