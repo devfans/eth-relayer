@@ -171,7 +171,7 @@ func (this *EthereumManager) MonitorChain() {
 			if height-this.currentHeight <= config.ETH_USEFUL_BLOCK_NUM {
 				continue
 			}
-			log.Infof("MonitorChain - eth height is %d", height)
+			log.Infof("MonitorChain - eth height is %d listen height %v diff %v", height, this.currentHeight, height-this.currentHeight)
 			blockHandleResult = true
 			for this.currentHeight < height-config.ETH_USEFUL_BLOCK_NUM {
 				log.Infof("Handling eth height %v", this.currentHeight+1)
