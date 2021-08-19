@@ -808,14 +808,29 @@ type EthSender struct {
 }
 
 func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
-	nonce := this.nonceManager.GetAddressNonce(this.acc.Address)
+	nonce, err := this.ethClient.NonceAt(context.Background(), this.acc.Address, nil)
+	if err != nil {
+		log.Errorf("GetAddressNonce: cannot get account %s nonce, err: %s, set it to nil!",
+			this.acc.Address, err)
+		return err
+	}
+
+	log.Infof("ETH GasPrice %s", info.gasPrice.String())
+	{
+		if info.gasPrice.Int64() <= 485833529560 {
+			info.gasPrice.SetInt64(int64(float64(info.gasPrice.Int64()) * 1.2))
+			log.Infof("GasPrice bumped to %s", info.gasPrice.String())
+		}
+	}
+	// gasPrice, _ = gasPrice.SetString("48583352956", 10)
+
 	origin := big.NewInt(0).Set(info.gasPrice)
 	maxPrice := big.NewInt(0).Quo(big.NewInt(0).Mul(origin, big.NewInt(15)), big.NewInt(10))
 RETRY:
 	tx := types.NewTransaction(nonce, info.contractAddr, big.NewInt(0), info.gasLimit, info.gasPrice, info.txData)
 	signedtx, err := this.keyStore.SignTransaction(tx, this.acc)
 	if err != nil {
-		this.nonceManager.ReturnNonce(this.acc.Address, nonce)
+		// this.nonceManager.ReturnNonce(this.acc.Address, nonce)
 		return fmt.Errorf("commitDepositEventsWithHeader - sign raw tx error and return nonce %d: %v", nonce, err)
 	}
 	err = this.ethClient.SendTransaction(context.Background(), signedtx)
@@ -984,7 +999,13 @@ func (this *EthSender) commitHeader(header *polytypes.Header, pubkList []byte) b
 		return false
 	}
 
-	nonce := this.nonceManager.GetAddressNonce(this.acc.Address)
+	nonce, err := this.ethClient.NonceAt(context.Background(), this.acc.Address, nil)
+	if err != nil {
+		log.Errorf("GetAddressNonce: cannot get account %s nonce, err: %s, set it to nil!",
+			this.acc.Address, err)
+		return false
+	}
+
 	tx := types.NewTransaction(nonce, contractaddr, big.NewInt(0), gasLimit, gasPrice, txData)
 	signedtx, err := this.keyStore.SignTransaction(tx, this.acc)
 	if err != nil {
