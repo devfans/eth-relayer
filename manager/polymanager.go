@@ -778,18 +778,20 @@ func (this *PolyManager) Stop() {
 }
 
 func (this *PolyManager) checkFee(checks []*poly_bridge_sdk.CheckFeeReq) ([]*poly_bridge_sdk.CheckFeeRsp, error) {
-	// return this.bridgeSdk.CheckFee(checks)
-	resp := make([]*poly_bridge_sdk.CheckFeeRsp, len(checks))
-	for i, r := range checks {
-		resp[i] = &poly_bridge_sdk.CheckFeeRsp{
-			ChainId:     r.ChainId,
-			PayState:    poly_bridge_sdk.STATE_HASPAY,
-			Hash:        r.Hash,
-			Amount:      "100",
-			MinProxyFee: "100",
+	return this.bridgeSdk.CheckFee(checks)
+	/*
+		resp := make([]*poly_bridge_sdk.CheckFeeRsp, len(checks))
+		for i, r := range checks {
+			resp[i] = &poly_bridge_sdk.CheckFeeRsp{
+				ChainId:     r.ChainId,
+				PayState:    poly_bridge_sdk.STATE_HASPAY,
+				Hash:        r.Hash,
+				Amount:      "100",
+				MinProxyFee: "100",
+			}
 		}
-	}
-	return resp, nil
+		return resp, nil
+	*/
 }
 
 type EthSender struct {
