@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"os"
 	"strconv"
 	"strings"
 
@@ -820,7 +819,7 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	log.Infof("ETH GasPrice %s", info.gasPrice.String())
 	{
 		if info.gasPrice.Int64() <= 485833529560 {
-			info.gasPrice.SetInt64(int64(float64(info.gasPrice.Int64()) * 1.2))
+			info.gasPrice.SetInt64(int64(float64(info.gasPrice.Int64()) * 1.3))
 			log.Infof("GasPrice bumped to %s", info.gasPrice.String())
 		}
 	}
@@ -841,8 +840,8 @@ RETRY:
 			this.nonceManager.ReturnNonce(this.acc.Address, nonce)
 			return fmt.Errorf("commitDepositEventsWithHeader - send transaction error and return nonce %d: %v", nonce, err)
 		*/
-		log.Errorf("send transactions err: %v", err)
-		os.Exit(1)
+		log.Errorf("send transactions err: %v %s", err, info.polyTxHash)
+		return nil
 		//log.Fatal("send transaction error!")
 	}
 	hash := signedtx.Hash()
@@ -855,8 +854,9 @@ RETRY:
 		log.Errorf("failed to relay tx to ethereum: (eth_hash: %s, nonce: %d, poly_hash: %s, eth_explorer: %s)",
 			hash.String(), nonce, info.polyTxHash, tools.GetExplorerUrl(this.keyStore.GetChainId())+hash.String())
 		if info.gasPrice.Cmp(maxPrice) > 0 {
-			log.Errorf("waitTransactionConfirm failed")
-			os.Exit(1)
+			log.Errorf("waitTransactionConfirm failed %s", info.polyTxHash)
+			return nil
+			// os.Exit(1)
 		}
 		info.gasPrice = big.NewInt(0).Quo(big.NewInt(0).Mul(info.gasPrice, big.NewInt(11)), big.NewInt(10))
 		if info.gasPrice.Cmp(maxPrice) >= 0 {
