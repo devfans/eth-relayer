@@ -133,7 +133,7 @@ func startServer(ctx *cli.Context) {
 		return
 	}
 
-	initPolyServer(servConfig, polySdk, ethereumsdk, boltDB)
+	// initPolyServer(servConfig, polySdk, ethereumsdk, boltDB)
 	initETHServer(servConfig, polySdk, ethereumsdk, boltDB)
 	waitToExit()
 }
@@ -170,8 +170,8 @@ func initETHServer(servConfig *config.ServiceConfig, polysdk *sdk.PolySdk, ether
 		return
 	}
 	go mgr.MonitorChain()
-	go mgr.MonitorDeposit()
-	go mgr.CheckDeposit()
+	// go mgr.MonitorDeposit()
+	// go mgr.CheckDeposit()
 }
 
 func initPolyServer(servConfig *config.ServiceConfig, polysdk *sdk.PolySdk, ethereumsdk *ethclient.Client, boltDB *db.BoltDB) {
