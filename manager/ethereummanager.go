@@ -435,7 +435,7 @@ func (this *EthereumManager) handleLockDepositEvents(refHeight uint64) error {
 		}
 		//1. decode events
 		key := crosstx.txIndex
-		log.Infof("Handling eth src tx %v %s %s", crosstx.height, key, string(crosstx.txId))
+		log.Infof("Handling eth src tx %v %x", crosstx.height, string(crosstx.txId))
 		keyBytes, err := eth.MappingKeyAt(key, "01")
 		if err != nil {
 			log.Errorf("handleLockDepositEvents - MappingKeyAt error:%s\n", err.Error())
