@@ -818,6 +818,10 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 			break
 		}
 		log.Errorf("(poly %s)commitDepositEventsWithHeader - get suggest sas price failed error: %s", info.polyTxHash, err.Error())
+		if i == 9 {
+			log.Errorf("ETH skipping send tx suggest gas price failed for poly hash %s err %v", info.polyTxHash, err)
+			return nil
+		}
 		time.Sleep(time.Second)
 	}
 	// Suggest gas tip here
@@ -828,6 +832,11 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 			break
 		}
 		log.Errorf("(poly %s)commitDepositEventsWithHeader - get suggest sas price failed error: %s", info.polyTxHash, err.Error())
+		if i == 9 {
+			log.Errorf("ETH skipping send tx suggest gas tip failed for poly hash %s err %v", info.polyTxHash, err)
+			return nil
+		}
+
 		time.Sleep(time.Second)
 	}
 
@@ -845,6 +854,11 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 				break
 			}
 			log.Errorf("(poly %s)commitDepositEventsWithHeader - estimate gas limit error: %s", info.polyTxHash, err.Error())
+
+			if i == 9 {
+				log.Errorf("ETH skipping send tx estimate gas limit failed for poly hash %s err %v", info.polyTxHash, err)
+				return nil
+			}
 			time.Sleep(time.Second)
 		}
 	}
