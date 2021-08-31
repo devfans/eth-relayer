@@ -824,6 +824,8 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 		}
 		time.Sleep(time.Second)
 	}
+	gasMax := big.NewInt(0).Quo(big.NewInt(0).Mul(gasCap, big.NewInt(30)), big.NewInt(10)) // max gas price
+
 	// Suggest gas tip here
 	for i := 0; i < 10; i++ {
 		gasPrice, err := this.ethClient.SuggestGasTipCap(context.Background())
@@ -843,8 +845,8 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	contractaddr := ethcommon.HexToAddress(this.config.ETHConfig.ECCMContractAddress)
 	if info.gasLimit == 0 {
 		callMsg := ethereum.CallMsg{
-			From: this.acc.Address, To: &contractaddr, Gas: 0, GasPrice: gasCap,
-			Value: big.NewInt(0), Data: info.txData,
+			From: this.acc.Address, To: &contractaddr, Gas: 0, // GasPrice: gasCap,
+			Value: big.NewInt(0), Data: info.txData, GasFeeCap: gasCap, GasTipCap: info.gasPrice,
 		}
 
 		for i := 0; i < 10; i++ {
@@ -875,7 +877,6 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 
 	origin := big.NewInt(0).Set(info.gasPrice)
 	maxPrice := big.NewInt(0).Quo(big.NewInt(0).Mul(origin, big.NewInt(15)), big.NewInt(10)) // max gas tip
-	gasMax := big.NewInt(0).Quo(big.NewInt(0).Mul(gasCap, big.NewInt(30)), big.NewInt(10))   // max gas price
 	count := 0
 RETRY:
 	count++
