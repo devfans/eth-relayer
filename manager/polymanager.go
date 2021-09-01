@@ -876,7 +876,7 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	// gasPrice, _ = gasPrice.SetString("48583352956", 10)
 
 	origin := big.NewInt(0).Set(info.gasPrice)
-	maxPrice := big.NewInt(0).Quo(big.NewInt(0).Mul(origin, big.NewInt(15)), big.NewInt(10)) // max gas tip
+	maxPrice := big.NewInt(0).Quo(big.NewInt(0).Mul(origin, big.NewInt(30)), big.NewInt(10)) // max gas tip
 	count := 0
 RETRY:
 	count++
