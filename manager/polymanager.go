@@ -921,7 +921,7 @@ RETRY:
 			return nil
 			// os.Exit(1)
 		}
-		info.gasPrice = big.NewInt(0).Quo(big.NewInt(0).Mul(info.gasPrice, big.NewInt(11)), big.NewInt(10))
+		info.gasPrice = big.NewInt(0).Quo(big.NewInt(0).Mul(info.gasPrice, big.NewInt(114)), big.NewInt(100))
 		if info.gasPrice.Cmp(maxPrice) >= 0 {
 			info.gasPrice.Set(maxPrice)
 		}
