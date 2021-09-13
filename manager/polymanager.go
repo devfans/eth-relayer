@@ -88,6 +88,13 @@ type BridgeTransaction struct {
 	fee          string
 }
 
+func CheckGasLimit(hash string, limit uint64) error {
+	if limit > 300000 {
+		return fmt.Errorf("Skipping poly tx %s for gas limit too high %d ", hash, limit)
+	}
+	return nil
+}
+
 func (this *BridgeTransaction) PolyHash() string {
 	return this.polyTxHash
 }
@@ -855,7 +862,7 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 				info.gasLimit = gasLimit
 				break
 			}
-			log.Errorf("(poly %s)commitDepositEventsWithHeader - estimate gas limit error: %s", info.polyTxHash, err.Error())
+			log.Errorf("(poly %s)commitDepositEventsWithHeader - estimate gas limit error: %s verbose: from(%s) to(%s) gas(0) value(0) data(%x) gasfeeGap(%s) gasTipCap(%s)!", info.polyTxHash, err.Error(), this.acc.Address, contractaddr, info.txData, gasCap, info.gasPrice)
 
 			if i == 9 {
 				log.Errorf("ETH skipping send tx estimate gas limit failed for poly hash %s err %v", info.polyTxHash, err)
@@ -874,6 +881,13 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 
 	log.Infof("ETH GasPrice %s", info.gasPrice.String())
 	// gasPrice, _ = gasPrice.SetString("48583352956", 10)
+
+	// Check gas limit
+	info.gasLimit = uint64(float32(info.gasLimit) * 1.1)
+	if e := CheckGasLimit(info.polyTxHash, info.gasLimit); e != nil {
+		log.Errorf("Skipped poly tx %s for gas limit too high %v", info.polyTxHash, info.gasLimit)
+		return nil
+	}
 
 	origin := big.NewInt(0).Set(info.gasPrice)
 	maxPrice := big.NewInt(0).Quo(big.NewInt(0).Mul(origin, big.NewInt(30)), big.NewInt(10)) // max gas tip
