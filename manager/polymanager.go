@@ -67,6 +67,8 @@ var METHODS = map[string]bool{
 	"onCrossTransfer": true,
 }
 
+var DEBUG = false
+
 const (
 	ChanLen = 0
 )
@@ -524,6 +526,7 @@ func (this *PolyManager) MonitorDeposit() {
 }
 
 func (this *PolyManager) HandlePolyBlockDirect(height uint32) {
+	DEBUG = true
 	lastEpoch := this.findLatestHeight()
 	hdr, err := this.polySdk.GetHeaderByHeight(height + 1)
 	if err != nil {
@@ -862,7 +865,11 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 				info.gasLimit = gasLimit
 				break
 			}
-			log.Errorf("(poly %s)commitDepositEventsWithHeader - estimate gas limit error: %s verbose: from(%s) to(%s) gas(0) value(0) data(%x) gasfeeGap(%s) gasTipCap(%s)!", info.polyTxHash, err.Error(), this.acc.Address, contractaddr, info.txData, gasCap, info.gasPrice)
+			if DEBUG {
+				log.Errorf("(poly %s)commitDepositEventsWithHeader - estimate gas limit error: %s verbose: from(%s) to(%s) gas(0) value(0) data(%x) gasfeeGap(%s) gasTipCap(%s)!", info.polyTxHash, err.Error(), this.acc.Address, contractaddr, info.txData, gasCap, info.gasPrice)
+			} else {
+				log.Errorf("(poly %s)commitDepositEventsWithHeader - estimate gas limit error: %s", info.polyTxHash, err.Error())
+			}
 
 			if i == 9 {
 				log.Errorf("ETH skipping send tx estimate gas limit failed for poly hash %s err %v", info.polyTxHash, err)
