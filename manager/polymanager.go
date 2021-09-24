@@ -901,6 +901,7 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	count := 0
 RETRY:
 	count++
+	if count > 9 { return fmt.Errorf("Attempts failed") }
 	tx := types.NewTx(&types.DynamicFeeTx{
 		Nonce:     nonce,
 		GasTipCap: info.gasPrice,
@@ -939,22 +940,16 @@ RETRY:
 			hash.String(), nonce, info.polyTxHash, tools.GetExplorerUrl(this.keyStore.GetChainId())+hash.String())
 		if info.gasPrice.Cmp(maxPrice) >= 0 {
 			log.Errorf("waitTransactionConfirm failed %s", info.polyTxHash)
-			return nil
+			return fmt.Errorf("Attempts exceeding max allowed gas price")
 			// os.Exit(1)
 		}
-		info.gasPrice = big.NewInt(0).Quo(big.NewInt(0).Mul(info.gasPrice, big.NewInt(114)), big.NewInt(100))
+		info.gasPrice = big.NewInt(0).Quo(big.NewInt(0).Mul(info.gasPrice, big.NewInt(118)), big.NewInt(100))
 		if info.gasPrice.Cmp(maxPrice) >= 0 {
 			info.gasPrice.Set(maxPrice)
 		}
 		log.Infof("GasPrice bumped to %s", info.gasPrice.String())
 		goto RETRY
 		//this.nonceManager.ReturnNonce(this.acc.Address, nonce)
-	}
-	if this.locked == false {
-		this.result <- true
-	} else {
-		log.Errorf("account %s has unlocked!", this.acc.Address.String())
-		this.locked = false
 	}
 	return nil
 }
@@ -1000,36 +995,16 @@ func (this *EthSender) commitDepositEventsWithHeader(header *polytypes.Header, p
 		log.Errorf("(poly %s)commitDepositEventsWithHeader - err:%v", polyTxHash, err.Error())
 		return false
 	}
-
-	k := this.getRouter()
-	c, ok := this.cmap[k]
-	if !ok {
-		c = make(chan *EthTxInfo, ChanLen)
-		this.cmap[k] = c
-		go func() {
-			for v := range c {
-				if err = this.sendTxToEth(v); err != nil {
-					log.Errorf("failed to send tx to ethereum: error: %v, txData: %s", err, hex.EncodeToString(v.txData))
-					this.result <- true
-				}
-			}
-		}()
-	}
-	//TODO: could be blocked
-	c <- &EthTxInfo{
+	err = this.sendTxToEth(&EthTxInfo{
 		txData:     txData,
 		gasPrice:   nil,
 		gasLimit:   0,
 		polyTxHash: polyTxHash,
+	})
+	if err != nil {
+		log.Errorf("failed to send tx to ethereum: error: %v, txData: %s", err, hex.EncodeToString(txData))
 	}
-	select {
-	case <-this.result:
-		return true
-	case <-time.After(time.Second * 300):
-		log.Errorf("account %s has locked!", this.acc.Address.String())
-		this.locked = true
-		return false
-	}
+	return err == nil
 }
 
 func (this *EthSender) commitHeader(header *polytypes.Header, pubkList []byte) bool {
