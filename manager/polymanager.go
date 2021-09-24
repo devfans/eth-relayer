@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"strings"
 
+	eccm_abi "github.com/KSlashh/poly-abi/abi_1.10.7/ccm"
+	eccd_abi "github.com/KSlashh/poly-abi/abi_1.10.7/eccd"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -34,8 +36,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ontio/ontology-crypto/keypair"
 	"github.com/ontio/ontology-crypto/signature"
-	"github.com/polynetwork/eth-contracts/go_abi/eccd_abi"
-	"github.com/polynetwork/eth-contracts/go_abi/eccm_abi"
 	"github.com/polynetwork/eth_relayer/config"
 	"github.com/polynetwork/eth_relayer/db"
 	"github.com/polynetwork/eth_relayer/log"
@@ -67,6 +67,8 @@ var METHODS = map[string]bool{
 	"onCrossTransfer": true,
 }
 
+var DEBUG = false
+
 const (
 	ChanLen = 0
 )
@@ -86,6 +88,13 @@ type BridgeTransaction struct {
 	rawAuditPath []byte
 	hasPay       uint8
 	fee          string
+}
+
+func CheckGasLimit(hash string, limit uint64) error {
+	if limit > 300000 {
+		return fmt.Errorf("Skipping poly tx %s for gas limit too high %d ", hash, limit)
+	}
+	return nil
 }
 
 func (this *BridgeTransaction) PolyHash() string {
@@ -517,6 +526,7 @@ func (this *PolyManager) MonitorDeposit() {
 }
 
 func (this *PolyManager) HandlePolyBlockDirect(height uint32) {
+	DEBUG = true
 	lastEpoch := this.findLatestHeight()
 	hdr, err := this.polySdk.GetHeaderByHeight(height + 1)
 	if err != nil {
@@ -812,6 +822,66 @@ type EthSender struct {
 }
 
 func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
+	var gasCap *big.Int
+	// Suggest gas tip here
+	for i := 0; i < 10; i++ {
+		gasPrice, err := this.ethClient.SuggestGasPrice(context.Background())
+		if err == nil {
+			gasCap = gasPrice
+			break
+		}
+		log.Errorf("(poly %s)commitDepositEventsWithHeader - get suggest gas price failed error: %s", info.polyTxHash, err.Error())
+		if i == 9 {
+			log.Errorf("ETH skipping send tx suggest gas price failed for poly hash %s err %v", info.polyTxHash, err)
+			return nil
+		}
+		time.Sleep(time.Second)
+	}
+	gasMax := big.NewInt(0).Quo(big.NewInt(0).Mul(gasCap, big.NewInt(30)), big.NewInt(10)) // max gas price
+
+	// Suggest gas tip here
+	for i := 0; i < 10; i++ {
+		gasPrice, err := this.ethClient.SuggestGasTipCap(context.Background())
+		if err == nil {
+			info.gasPrice = gasPrice
+			break
+		}
+		log.Errorf("(poly %s)commitDepositEventsWithHeader - get suggest gas tip failed error: %s", info.polyTxHash, err.Error())
+		if i == 9 {
+			log.Errorf("ETH skipping send tx suggest gas tip failed for poly hash %s err %v", info.polyTxHash, err)
+			return nil
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	contractaddr := ethcommon.HexToAddress(this.config.ETHConfig.ECCMContractAddress)
+	if info.gasLimit == 0 {
+		callMsg := ethereum.CallMsg{
+			From: this.acc.Address, To: &contractaddr, Gas: 0, // GasPrice: gasCap,
+			Value: big.NewInt(0), Data: info.txData, GasFeeCap: gasCap, GasTipCap: info.gasPrice,
+		}
+
+		for i := 0; i < 10; i++ {
+			gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)
+			if err == nil {
+				info.gasLimit = gasLimit
+				break
+			}
+			if DEBUG {
+				log.Errorf("(poly %s)commitDepositEventsWithHeader - estimate gas limit error: %s verbose: from(%s) to(%s) gas(0) value(0) data(%x) gasfeeGap(%s) gasTipCap(%s)!", info.polyTxHash, err.Error(), this.acc.Address, contractaddr, info.txData, gasCap, info.gasPrice)
+			} else {
+				log.Errorf("(poly %s)commitDepositEventsWithHeader - estimate gas limit error: %s", info.polyTxHash, err.Error())
+			}
+
+			if i == 9 {
+				log.Errorf("ETH skipping send tx estimate gas limit failed for poly hash %s err %v", info.polyTxHash, err)
+				return nil
+			}
+			time.Sleep(time.Second)
+		}
+	}
+
 	nonce, err := this.ethClient.NonceAt(context.Background(), this.acc.Address, nil)
 	if err != nil {
 		log.Errorf("GetAddressNonce: cannot get account %s nonce, err: %s, set it to nil!",
@@ -820,18 +890,32 @@ func (this *EthSender) sendTxToEth(info *EthTxInfo) error {
 	}
 
 	log.Infof("ETH GasPrice %s", info.gasPrice.String())
-	{
-		if info.gasPrice.Int64() <= 485833529560 {
-			info.gasPrice.SetInt64(int64(float64(info.gasPrice.Int64()) * 1.3))
-			log.Infof("GasPrice bumped to %s", info.gasPrice.String())
-		}
-	}
 	// gasPrice, _ = gasPrice.SetString("48583352956", 10)
 
+	// Check gas limit
+	info.gasLimit = uint64(float32(info.gasLimit) * 1.1)
+	if e := CheckGasLimit(info.polyTxHash, info.gasLimit); e != nil {
+		log.Errorf("Skipped poly tx %s for gas limit too high %v", info.polyTxHash, info.gasLimit)
+		return nil
+	}
+
 	origin := big.NewInt(0).Set(info.gasPrice)
-	maxPrice := big.NewInt(0).Quo(big.NewInt(0).Mul(origin, big.NewInt(15)), big.NewInt(10))
+	maxPrice := big.NewInt(0).Quo(big.NewInt(0).Mul(origin, big.NewInt(30)), big.NewInt(10)) // max gas tip
+	count := 0
 RETRY:
-	tx := types.NewTransaction(nonce, info.contractAddr, big.NewInt(0), info.gasLimit, info.gasPrice, info.txData)
+	count++
+	tx := types.NewTx(&types.DynamicFeeTx{
+		Nonce:     nonce,
+		GasTipCap: info.gasPrice,
+		GasFeeCap: gasMax,
+		Gas:       info.gasLimit,
+		To:        &contractaddr,
+		Value:     big.NewInt(0),
+		Data:      info.txData,
+	})
+	log.Infof("ETH(attempts %d) send tx tip %s fee cap %s limit %d  poly hash: %s", count, info.gasPrice.String(), gasMax.String(), info.gasLimit, info.polyTxHash)
+
+	// tx := types.NewTransaction(nonce, contractaddr, big.NewInt(0), info.gasLimit, info.gasPrice, info.txData)
 	signedtx, err := this.keyStore.SignTransaction(tx, this.acc)
 	if err != nil {
 		// this.nonceManager.ReturnNonce(this.acc.Address, nonce)
@@ -844,7 +928,7 @@ RETRY:
 			return fmt.Errorf("commitDepositEventsWithHeader - send transaction error and return nonce %d: %v", nonce, err)
 		*/
 		log.Errorf("send transactions err: %v %s", err, info.polyTxHash)
-		return nil
+		// return nil
 		//log.Fatal("send transaction error!")
 	}
 	hash := signedtx.Hash()
@@ -856,15 +940,16 @@ RETRY:
 	} else {
 		log.Errorf("failed to relay tx to ethereum: (eth_hash: %s, nonce: %d, poly_hash: %s, eth_explorer: %s)",
 			hash.String(), nonce, info.polyTxHash, tools.GetExplorerUrl(this.keyStore.GetChainId())+hash.String())
-		if info.gasPrice.Cmp(maxPrice) > 0 {
+		if info.gasPrice.Cmp(maxPrice) >= 0 {
 			log.Errorf("waitTransactionConfirm failed %s", info.polyTxHash)
 			return nil
 			// os.Exit(1)
 		}
-		info.gasPrice = big.NewInt(0).Quo(big.NewInt(0).Mul(info.gasPrice, big.NewInt(11)), big.NewInt(10))
+		info.gasPrice = big.NewInt(0).Quo(big.NewInt(0).Mul(info.gasPrice, big.NewInt(114)), big.NewInt(100))
 		if info.gasPrice.Cmp(maxPrice) >= 0 {
 			info.gasPrice.Set(maxPrice)
 		}
+		log.Infof("GasPrice bumped to %s", info.gasPrice.String())
 		goto RETRY
 		//this.nonceManager.ReturnNonce(this.acc.Address, nonce)
 	}
@@ -919,22 +1004,6 @@ func (this *EthSender) commitDepositEventsWithHeader(header *polytypes.Header, p
 		return false
 	}
 
-	gasPrice, err := this.ethClient.SuggestGasPrice(context.Background())
-	if err != nil {
-		log.Errorf("(poly %s)commitDepositEventsWithHeader - get suggest sas price failed error: %s", polyTxHash, err.Error())
-		return false
-	}
-	contractaddr := ethcommon.HexToAddress(this.config.ETHConfig.ECCMContractAddress)
-	callMsg := ethereum.CallMsg{
-		From: this.acc.Address, To: &contractaddr, Gas: 0, GasPrice: gasPrice,
-		Value: big.NewInt(0), Data: txData,
-	}
-	gasLimit, err := this.ethClient.EstimateGas(context.Background(), callMsg)
-	if err != nil {
-		log.Errorf("(poly %s)commitDepositEventsWithHeader - estimate gas limit error: %s", polyTxHash, err.Error())
-		return true
-	}
-
 	k := this.getRouter()
 	c, ok := this.cmap[k]
 	if !ok {
@@ -951,11 +1020,10 @@ func (this *EthSender) commitDepositEventsWithHeader(header *polytypes.Header, p
 	}
 	//TODO: could be blocked
 	c <- &EthTxInfo{
-		txData:       txData,
-		contractAddr: contractaddr,
-		gasPrice:     gasPrice,
-		gasLimit:     gasLimit,
-		polyTxHash:   polyTxHash,
+		txData:     txData,
+		gasPrice:   nil,
+		gasLimit:   0,
+		polyTxHash: polyTxHash,
 	}
 	select {
 	case <-this.result:

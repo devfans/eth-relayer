@@ -47,7 +47,6 @@ type RestClient struct {
 	Addr       string
 	restClient *http.Client
 }
-
 func NewRestClient() *RestClient {
 	return &RestClient{
 		restClient: &http.Client{
@@ -85,3 +84,4 @@ func (self *RestClient) SendRestRequest(addr string, data []byte) ([]byte, error
 	}
 	return body, nil
 }
+

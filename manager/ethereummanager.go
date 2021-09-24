@@ -25,11 +25,11 @@ import (
 	"strings"
 	"time"
 
+	eccm_abi "github.com/KSlashh/poly-abi/abi_1.10.7/ccm"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ontio/ontology/smartcontract/service/native/cross_chain/cross_chain_manager"
-	"github.com/polynetwork/eth-contracts/go_abi/eccm_abi"
 	"github.com/polynetwork/eth_relayer/config"
 	"github.com/polynetwork/eth_relayer/db"
 	common2 "github.com/polynetwork/poly/native/service/cross_chain_manager/common"
@@ -435,7 +435,7 @@ func (this *EthereumManager) handleLockDepositEvents(refHeight uint64) error {
 		}
 		//1. decode events
 		key := crosstx.txIndex
-		log.Infof("Handling eth src tx %v %s %s", crosstx.height, key, string(crosstx.txId))
+		log.Infof("Handling eth src tx %v %x", crosstx.height, string(crosstx.txId))
 		keyBytes, err := eth.MappingKeyAt(key, "01")
 		if err != nil {
 			log.Errorf("handleLockDepositEvents - MappingKeyAt error:%s\n", err.Error())
