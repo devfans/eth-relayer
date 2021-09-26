@@ -48,7 +48,7 @@ import (
 	"math/big"
 	"time"
 
-	poly_bridge_sdk "poly-bridge/bridgesdk"
+	poly_bridge_sdk "github.com/polynetwork/poly-bridge/bridgesdk"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/polynetwork/eth_relayer/tools"
